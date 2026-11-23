@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for merging annotation sources into product tables."""
+"""merge annotation sources into the product table"""
 
 import os
 import os.path
@@ -25,18 +25,15 @@ def main(
     nohit_ids: list[str] = []
 
     def temporary_query(arq):
-        # temporary adding a line to the BLAST analysis
-        #   so it accounts for the last query found by the BLAST algorithm
+        # append a sentinel BLAST row so the last query is processed
         try:
             temp = arq[-1].split("\t")
             del temp[0]
             temp.insert(0, "QueryTemp")
             arq.append("\t".join(temp))
-        # Index error ocours when Interproscan returns no results, as consequence, arq is empty, and split empty file is not allowed
+        # an empty InterProScan result has no row to copy
         except IndexError:
             arq.append("\t".join("QueryTemp"))
-
-    # ------------------------------------------
 
     def parser_interproscan(arq_entrada, arq_ipr):
         with open(arq_entrada) as source:
@@ -54,7 +51,7 @@ def main(
                         linha = linha.split(" ")
                         del linha[0]
                     elif linha == seq_reg[1]:
-                        # Ignore the first line of each query group.
+                        # skip the sequence-region header for each group
                         pass
                     else:
                         ontologia = str(None)
@@ -67,7 +64,7 @@ def main(
                         try:
                             evalue = str(linha[5]).replace(",", ".").lower()
                         except Exception:
-                            # Type of evalue format
+                            # keep the source format when normalisation fails
                             evalue = str(linha[5])
                         if not any(s in db.lower() for s in lista):
                             db_certo = db
@@ -89,10 +86,9 @@ def main(
                                 f"{ontologia}\n"
                             )
 
-    # Function to write ids with no ipr and no GO (no result from InterproScan)
+    # write products without InterPro or GO evidence
     def write_no_ipr(ids_dict):
-        # If there's any id without hit in interproscan file
-        # It's will write here, without IPR or GO
+        # annotated products without an InterProScan hit keep their description
         if len(ids_dict.keys()) > 0:
             for anot in ids_dict:
                 output.write(f"{anot}\t{str(ids_dict.get(anot)).strip()}\n")
@@ -101,9 +97,9 @@ def main(
         if len(nohit_ids) > 0:
             output.writelines(f"{hyp}\thypothetical protein\n" for hyp in nohit_ids)
 
-    # Function to join IPRs and GOs from InterproScan with IDs hypothetical or without hits
+    # attach InterPro and GO terms to hypothetical or no-hit products
     def intepro_process(ids_dict):
-        # File pre-precessed with IDs, IPRs and go_list
+        # read the preprocessed identifier, IPR and GO table
         with open("Interpro_out_tmp.txt") as source:
             interpro_out = source.read().splitlines()
         temporary_query(interpro_out)
@@ -111,7 +107,7 @@ def main(
         old_id = interpro_out[0].split("\t")
         old_id = old_id[0]
 
-        # Initialize lists
+        # collect terms for the current identifier
         go_list = []
         ipr_list = []
         for query in interpro_out:
@@ -120,14 +116,14 @@ def main(
             ipr = str(title[5]).split(",")
             go = str(title[6]).split(",")
             if old_id != new_id:
-                # Sort IPRs and go_list
+                # sort terms by their numeric suffix
                 try:
                     ipr_list.sort(key=lambda item: str(item).split("IPR")[1])
                     go_list.sort(key=lambda item: str(item).split("GO")[1])
                 except Exception:
-                    # No GO or IP for this protein (not a true warning)
+                    # missing terms are expected, not a warning
                     pass
-                # Check if interpro_result is in annotated
+                # annotated products keep their BLAST description
                 if old_id in ids_dict:
                     if (len(ipr_list) > 0) and (len(go_list) > 0):
                         output.write(
@@ -144,7 +140,7 @@ def main(
                     else:
                         output.write(f"{old_id}\t{str(ids_dict.get(old_id)).strip()}\n")
                     del ids_dict[old_id]
-                # Else, interpro_result must be in hypothetical
+                # otherwise treat the product as hypothetical
                 elif old_id in hypo_ids:
                     if (len(ipr_list) > 0) and (len(go_list) > 0):
                         output.write(
@@ -179,7 +175,7 @@ def main(
                     nohit_ids.remove(old_id)
                 go_list.clear()
                 ipr_list.clear()
-                # GET FIRST ITEM FOR NEW ID - After save old
+                # seed the term lists for the next identifier
                 for match in ipr:
                     if (match != "None") and (match not in ipr_list):
                         ipr_list.append(match)
@@ -198,18 +194,18 @@ def main(
         os.remove("Interpro_out_tmp.txt")
 
     Path("Interpro_out_tmp.txt").unlink(missing_ok=True)
-    # ---------------------- Create organized file with iprs and gos -----------------------
+    # build the preprocessed InterProScan table
     if (os.path.getsize(ipr1) == 0) and (os.path.getsize(ipr2) == 0):
-        # Can't process empty file
+        # skip parsing when both files are empty
         pass
     else:
-        # Almost one file has result - but, if one of them hasn't parser will crash
+        # parse only files with results
         if os.path.getsize(ipr1) != 0:
             parser_interproscan(ipr1, "Interpro_out_tmp.txt")
         if os.path.getsize(ipr2) != 0:
             parser_interproscan(ipr2, "Interpro_out_tmp.txt")
 
-    # ---------------------- Pre-parse annotated products -------------------------
+    # read annotated products into an identifier map
     with open(annot) as source:
         annotation_lines = source.read().splitlines()
     ids = []
@@ -223,13 +219,13 @@ def main(
 
     ids_dict = dict(
         zip(ids, desc, strict=False)
-    )  # Create dictionary with id as key and annotation as value
+    )  # map each identifier to its description
 
-    # ---------------------- Create list with hypothetical ids -----------------
+    # read hypothetical identifiers
     if os.path.getsize(hypo) != 0:
         with open(hypo) as source:
             hypo_ids = source.read().splitlines()
-    # ---------------------- Create list with no_hits ids -----------------
+    # read no-hit identifiers
     if os.path.getsize(nohit) != 0:
         with open(nohit) as source:
             nohit_ids = source.read().splitlines()

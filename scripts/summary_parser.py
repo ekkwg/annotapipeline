@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for building the AnnotaPipeline summary table."""
+"""build the AnnotaPipeline per-protein summary table"""
 
 import re
 
@@ -29,7 +29,7 @@ def main(
             entrada = source.read().split("##FASTA")
         interp = entrada[0].split(
             "##sequence-region"
-        )  # WE'LL BE USING ONLY THE FIRST PART OF THE GFF3 OUTPUT FILE
+        )  # keep only the annotation section before FASTA
         del interp[0]
 
         unwanted_db = ["coils", "gene3d", "mobidblite"]
@@ -41,7 +41,7 @@ def main(
             return ontologia, interpro, superfamily
 
         def add_to_dicts(id, go, ipr, superfamily):
-            # Remove duplicates from lists and add to dict
+            # store unique values in the per-protein dictionaries
             superfamily_dict[id] = ",".join(sorted(set(superfamily)))
             ipr_dict[id] = ",".join(sorted(set(ipr)))
             go_dict[id] = ",".join(sorted(go))
@@ -54,7 +54,7 @@ def main(
             if not superfamily:
                 superfamily.append("None")
 
-        # TREATING EACH QUERY, RETRIEVING THE INFORMATION THAT WILL BE WRITTEN ON THE FIRST OUTPUT FILE
+        # collect ontology and domain evidence for each query
         for seq_reg in interp:
             ontologia, interpro, superfamily = create_or_reset_lists()
             seq_reg = seq_reg.splitlines()
@@ -68,7 +68,7 @@ def main(
                         add_none_to_empty()
                         add_to_dicts(nome_subject, ontologia, interpro, superfamily)
                         ontologia, interpro, superfamily = create_or_reset_lists()
-                    # IGNORING THE FIRST LINE ON EACH GROUP OF QUERIES, AS IT'S NON-INFORMATIVE
+                    # skip the sequence-region header
                 else:
                     linha = linha.split("\t")
                     nome_subject = linha[0]
@@ -119,7 +119,7 @@ def main(
     def get_transcripts(file):
         with open(file) as source:
             transcripts = source.read().splitlines()
-        # Remove header
+        # skip the header row
         del transcripts[0]
         for line in transcripts:
             line = line.split("\t")
@@ -131,7 +131,7 @@ def main(
     def get_proteomics(file):
         with open(file) as source:
             proteomics = source.read().splitlines()
-        # Remove header
+        # skip the header row
         del proteomics[0]
         for line in proteomics:
             line = line.split("\t")
@@ -139,12 +139,12 @@ def main(
             if line[1] != "0":
                 unique_peptide[line[0]] = line[1]
 
-    # Get interpro info
+    # read InterProScan evidence
     get_interpro_info(ipr_annot)
     get_interpro_info(ipr_hyp)
     get_annotation(annot)
     annotation_sources = [annotation_dict, go_dict, ipr_dict, superfamily_dict]
-    # Join optional analysis if needed
+    # include optional analysis results
     if tr:
         get_transcripts(tr)
         annotation_sources.append(transcript_dict)
@@ -153,7 +153,7 @@ def main(
         annotation_sources.append(unique_peptide)
         annotation_sources.append(total_peptide)
 
-    # dict preserves first-seen order and gives O(1) membership checks
+    # dict keeps input order and gives O(1) membership checks
     unique_id_proteins = {}
     for source in annotation_sources:
         for key in source:

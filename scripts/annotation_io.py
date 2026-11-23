@@ -1,11 +1,11 @@
-"""Sequence preparation and proteomics aggregation shared by both runners."""
+"""prepare sequences and aggregate proteomics for both runners"""
 
 import logging
 from pathlib import Path
 
 
 def sequence_cleaner(fasta_file, min_length=0, output_file=None):
-    """Write records meeting the minimum length, preserving input order."""
+    """write records meeting the minimum length, preserving input order"""
     from Bio import SeqIO
 
     destination = output_file or f"Clear_{Path(fasta_file).name}"
@@ -17,7 +17,7 @@ def sequence_cleaner(fasta_file, min_length=0, output_file=None):
 
 
 def fasta_fetcher(input_fasta, id_list, fetcher_output):
-    """Write FASTA records whose identifiers exactly match ``id_list``."""
+    """write FASTA records whose identifiers exactly match ``id_list``"""
     from Bio import SeqIO
 
     wanted = set(id_list)
@@ -32,7 +32,7 @@ def fasta_fetcher(input_fasta, id_list, fetcher_output):
 
 
 def annotate_codingseq(aa_fasta, codingseq_fasta, basename):
-    """Transfer protein annotations to coding sequences by exact ID."""
+    """transfer protein annotations to coding sequences by exact ID"""
     from Bio import SeqIO
 
     with SeqIO.parse(aa_fasta, "fasta") as source:
@@ -52,7 +52,7 @@ def annotate_codingseq(aa_fasta, codingseq_fasta, basename):
 
 
 def add_features(feature, data, save):
-    """Compute the legacy unique and total counts for one feature."""
+    """compute the legacy unique and total counts for one feature"""
     unique_column = f"Unique {feature}"
     total_column = f"Total {feature}"
     selected = data.copy()
@@ -85,7 +85,7 @@ def aggregate_proteomics(parsed_files, output_file):
     for path in parsed_files:
         data = pd.concat([data, pd.read_csv(path, sep="\t", header=0)])
 
-    # retain legacy counting, including indices and spectrum identifiers
+    # retain legacy counting, which uses row indices and spectrum IDs
     total = add_features("Peptide", data, pd.DataFrame())
     total = add_features("Spectrum", data, total)
     total = total.fillna(0).astype({"Unique Peptide": int, "Unique Spectrum": int})

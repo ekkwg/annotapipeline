@@ -1,4 +1,4 @@
-"""Shared GFF3 and annotation-table helpers for the legacy parsers."""
+"""read GFF3 records and annotation tables for the parsers"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def read_annotation_table(path: str | Path) -> dict[str, str]:
-    """Read a two-column table without truncating descriptions at tabs."""
+    """read a two-column table without truncating descriptions at tabs"""
     result = {}
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         fields = line.split("\t", 1)
@@ -18,12 +18,12 @@ def read_annotation_table(path: str | Path) -> dict[str, str]:
 
 
 def parse_annotations(path: str | Path) -> dict[str, str]:
-    """Alias for the legacy parser's annotation table helper name."""
+    """alias for the legacy parser's annotation table helper name"""
     return read_annotation_table(path)
 
 
 def parse_gff_transcripts(path: str | Path) -> dict[str, dict[str, str]]:
-    """Return transcript coordinates from AUGUSTUS-style GFF3."""
+    """return transcript coordinates from AUGUSTUS-style GFF3"""
     records = {}
     for fields in gff3_records(path):
         if fields[2] != "transcript":
@@ -40,7 +40,7 @@ def parse_gff_transcripts(path: str | Path) -> dict[str, dict[str, str]]:
 
 
 def gff3_records(path: str | Path) -> Iterator[list[str]]:
-    """Yield non-comment GFF3 records with their nine standard fields."""
+    """yield non-comment GFF3 records with their nine standard fields"""
     for number, line in enumerate(
         Path(path).read_text(encoding="utf-8").splitlines(), 1
     ):
@@ -53,7 +53,7 @@ def gff3_records(path: str | Path) -> Iterator[list[str]]:
 
 
 def iter_interpro_groups(path: str | Path) -> Iterator[tuple[str, list[str]]]:
-    """Group InterProScan GFF3 annotations by transcript identifier."""
+    """group InterProScan GFF3 annotations by transcript identifier"""
     current: str | None = None
     lines: list[str] = []
     for fields in gff3_records(path):

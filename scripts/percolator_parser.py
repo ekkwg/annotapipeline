@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for filtering Percolator output by q-value."""
+"""filter Percolator PSMs by q-value"""
 
 import sys
 import warnings
@@ -18,12 +18,12 @@ def main(
     basename: str = typer.Option(..., "-b", "--basename"),
     qvalue: float = typer.Option(0.05, "-qv", "-q-value"),
 ) -> None:
-    # Check qvalue
+    # reject q-values outside the probability range
     if not 0.0 <= qvalue <= 1.0:
         print("-qv value must be between 0-1")
         sys.exit(1)
 
-    # --- PARSE QVALUE -----------------------------
+    # write PSMs at or below the q-value cutoff
 
     with open(proteom) as source:
         percolator_file = source.readlines()
@@ -36,32 +36,31 @@ def main(
             if float(fields[2]) <= qvalue:
                 parcial_output.write(str("\t".join(fields)))
 
-    # ---------- Parse information ----------------
-
-    # open file that will be used to extract peptides
+    # map peptides and spectra to protein identifiers
+    # reread the filtered table to collect evidence
     with open(f"{basename}_qvalue_filtered.tsv") as source:
         percolator_out = source.readlines()
-    # Check if there are valid queries for qvalue used as cutoff
+    # stop when no PSM passes the q-value cutoff
     if len(percolator_out) < 2:
         warnings.warn(
             f"INFO: file {basename}_qvalue_filtered.tsv return no valid queries for qvalue",
             stacklevel=2,
         )
         sys.exit(2)
-    # Remove index
+    # skip the header row
     del percolator_out[0]
 
     dict_write = {}
     for line in percolator_out:
         line_split = line.rstrip("\n").split("\t")
-        # Protein Id > can have more than one
+        # a PSM may identify several proteins
         all_ids = line_split[5:]
         peptide = line_split[4]
         filecontent = line_split[0].split("/")[-1]
         _idname, spectrum, _charge, _num = filecontent.rsplit("_", 3)
         if len(all_ids) > 1:
             for protein_id in all_ids:
-                # remove decoy matches
+                # ignore decoy proteins
                 if "DECOY" in protein_id:
                     pass
                 elif protein_id not in dict_write:
@@ -69,9 +68,9 @@ def main(
                 else:
                     dict_write[f"{protein_id}"].append(f"{peptide}\t{spectrum}\n")
         else:
-            # If list contains only one element, get this guy
+            # handle a single protein identifier
             only_id = all_ids[0]
-            # remove decoy matches
+            # ignore decoy proteins
             if "DECOY" in only_id:
                 pass
             elif only_id not in dict_write:

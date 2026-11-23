@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for joining annotations into a GFF file."""
+"""write protein annotations into the transcript GFF"""
 
 import re
 

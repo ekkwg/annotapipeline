@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for the shell-driven AnnotaPipeline orchestrator."""
+"""run the shell-driven AnnotaPipeline orchestrator"""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ RAW_ANNOTATIONS = "All_annotation_products.txt"
 
 
 class PipelineError(RuntimeError):
-    """Raised when a pipeline step cannot produce a required output."""
+    """raise when a pipeline step cannot produce a required output"""
 
 
 def configure_logging() -> None:
@@ -64,7 +64,7 @@ def script(name: str) -> Path:
 
 
 def version_key(text: str) -> list[int | str]:
-    """Sort identifiers containing numbers in natural version order."""
+    """sort identifiers containing numbers in natural version order"""
     return [
         int(part) if part.isdigit() else part.lower()
         for part in re.split(r"(\d+)", text)
@@ -96,7 +96,7 @@ def sort_tsv(source: Path, target: Path) -> Path:
 
 
 def flag_value(value: Any) -> str:
-    """Convert a legacy flag to text without changing free-form values."""
+    """convert a legacy flag without changing free-form values"""
     text = str(value)
     return as_flag(value) if text.lower() in {"on", "off", "flag"} else text
 
@@ -132,7 +132,7 @@ def augustus_paths(settings: dict) -> tuple[Path, Path, Path]:
 
 
 def tool_flags(settings: dict, *, skip: set[str]) -> list[str]:
-    """Translate legacy optional tool settings into command-line flags."""
+    """translate optional tool settings into command-line flags"""
     flags: list[str] = []
     for key, value in settings.items():
         if key in skip or value in (None, ""):
@@ -520,7 +520,7 @@ def main(
     if (seq is None) == (protein is None):
         raise typer.BadParameter("exactly one of -s/--seq or -p/--prot is required")
     source_input = seq or protein
-    if source_input is None:  # unreachable; keeps the selected input explicit
+    if source_input is None:  # unreachable after validation; narrows the type
         raise typer.BadParameter("exactly one of -s/--seq or -p/--prot is required")
     if gff and protein is None:
         raise typer.BadParameter("-gff requires -p/--prot")

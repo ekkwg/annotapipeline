@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for filtering Kallisto output by a TPM threshold."""
+"""filter Kallisto abundance rows by a TPM threshold"""
 
 from pathlib import Path
 
@@ -24,15 +24,15 @@ def main(
         raise typer.BadParameter(
             "exactly one of -tpmavg, -tpmmd or -tpmval is required"
         )
-    # SET FILE LOCATION ------------------------------------------------------------
+    # resolve the input before any directory changes
 
     kallisto_file = Path(ktfile).absolute()
 
-    # OPEN DATAFRAMES --------------------------------------------------------------
+    # read the abundance table
 
     df_kallisto = pd.read_csv(kallisto_file, sep="\t")
 
-    # PARSE DATAFRAMES -------------------------------------------------------------
+    # apply the chosen TPM cutoff
 
     if tpm_avg:
         tpm = df_kallisto["tpm"].mean()

@@ -1,4 +1,4 @@
-"""Shared logging setup for the legacy command-line adapters."""
+"""configure logging for the command-line adapters"""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ DATE_FORMAT = "%d/%m/%Y %H:%M:%S"
 def configure(
     filename: str, *, name: str | None = None, level: int = logging.INFO
 ) -> logging.Logger:
-    """Write log records to ``filename`` using the legacy layout."""
+    """write log records to ``filename`` using the legacy layout"""
     logging.basicConfig(
         level=level,
         format=LOG_FORMAT,
@@ -26,7 +26,7 @@ def configure(
 
 
 class StreamToLogger:
-    """File-like stream that forwards complete lines to a logger."""
+    """file-like stream that forwards complete lines to a logger"""
 
     def __init__(self, logger: logging.Logger, level: int = logging.ERROR) -> None:
         self.logger = logger
@@ -52,7 +52,7 @@ class StreamToLogger:
 
 
 def redirect_stderr(logger: logging.Logger) -> TextIO:
-    """Replace ``sys.stderr`` with a logger-backed stream."""
+    """replace ``sys.stderr`` with a logger-backed stream"""
     original = sys.stderr
     sys.stderr = StreamToLogger(logger)
     return original

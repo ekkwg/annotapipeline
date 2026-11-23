@@ -1,4 +1,4 @@
-"""Internal task adapters. Nextflow supplies staged files and task settings."""
+"""run one Nextflow task from staged files and encoded settings"""
 
 import json
 import os
@@ -191,7 +191,7 @@ def hmmscan(options, cpus):
     if not Path("query.fasta").stat().st_size:
         Path(out).write_text("")
         return
-    # hmmer starts worker threads in addition to the main thread
+    # reserve one CPU because hmmer starts worker threads too
     run(
         options["exe"],
         "--cpu",
@@ -421,7 +421,7 @@ def comet(options, cpus):
     pins = list(Path(".").glob("*.pin"))
     if len(pins) != 1:
         raise ValueError(f"expected one Comet PIN for {spectrum}, got {pins}")
-    # use a uniform name internally; the workflow publishes by spectrum ID
+    # rename to one stable task output; the workflow publishes by spectrum ID
     required(pins[0]).rename("result.pin")
 
 
@@ -475,7 +475,7 @@ def aggregate(options, _):
     files = sorted(Path("observations").glob("*_parsed.tsv"))
     if not files:
         raise ValueError("missing Percolator observations")
-    # sort data, not the header, so summary can consume header-only output
+    # sort rows only, so the summary table keeps a stable header
     aggregate_proteomics(files, "unsorted.tsv")
     with open("unsorted.tsv") as table:
         header = table.readline()

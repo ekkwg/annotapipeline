@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for parsing InterProScan, HMMER and RPSBLAST output."""
+"""parse InterProScan, HMMER and RPS-BLAST evidence"""
 
 import logging
 import re
@@ -45,7 +45,7 @@ def main(
                         linha = linha.split(" ")
                         del linha[0]
                     elif linha == seq_reg[1]:
-                        # Ignore the first line of each query group.
+                        # skip the sequence-region header for each group
                         pass
                     else:
                         ontology = str(None)
@@ -131,33 +131,32 @@ def main(
             ordered.write("ID\tDB\tDB_ACCESS\tDESCRIPTION\tIPR\tGO\n")
             ordered.writelines(str(line) for line in lines)
 
-    # ------------ Hipothetical ---------------------------------------
-    # Parse interproscan file
+    # collect evidence for hypothetical proteins
+    # parse InterProScan output
     parser_interproscan(
         ipr_hyp, f"InterProScan_Out_{basename}.tsv", f"Temp_{basename}.tsv"
     )
     logger.info("InterProScan parser done")
-    # Parse HMMer file
+    # reformat HMMER output
     pfam_format(hmm, f"Hmmscan_Out_{basename}.tsv")
     logger.info("Hmmscan format done")
     parser_pfam(f"Hmmscan_Out_{basename}.tsv", f"Temp_{basename}.tsv")
     logger.info("Hmmscan parser done")
-    # Parse RPSblast file
+    # parse RPS-BLAST output
     parser_rpsblast(rpsblast, f"RPSblast_Out_{basename}.tsv", f"Temp_{basename}.tsv")
     logger.info("RPSblast parser done")
-    # Group and sort
+    # group and sort evidence for hypothetical proteins
     sort_arq(
         f"Temp_{basename}.tsv",
         f"{basename}_Grouped_Hypothetical_Information.tsv",
     )
     logger.info("Sorting queryes in files")
 
-    # ------------ Annotated -----------------------------------------
-    # Save annotated proteins in Interpro_Out
+    # collect InterProScan evidence for annotated proteins
     parser_interproscan(
         ipr_annot, f"InterProScan_Out_{basename}.tsv", f"Temp_{basename}.tsv"
     )
-    # Cleaning the house
+    # remove the scratch table
     Path(f"Temp_{basename}.tsv").unlink(missing_ok=True)
     logger.info("Temporary file removed")
     logger.info("Functional Annotation step is completed")

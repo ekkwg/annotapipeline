@@ -1,4 +1,4 @@
-"""Canonical schema, defaults, validation and loading for the legacy runner."""
+"""load and validate TOML configuration for the legacy runner"""
 
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ _BOOLEAN_TEXT = {"flag", "on", "off"}
 
 
 class ConfigError(ValueError):
-    """Raised when a configuration file is invalid."""
+    """raise when a configuration file is invalid"""
 
 
 def _default() -> dict[str, Any]:
@@ -312,7 +312,7 @@ def _validate(config: dict[str, Any], path: Path, protein_mode: bool) -> None:
 
 
 def load(path: str | Path, *, protein_mode: bool = False) -> dict[str, Any]:
-    """Load and validate a TOML legacy-runner configuration."""
+    """load and validate a TOML configuration for the legacy runner"""
     source = Path(path)
     document = _parse(source)
     sections = {}
@@ -330,7 +330,7 @@ def load(path: str | Path, *, protein_mode: bool = False) -> dict[str, Any]:
                 raise ConfigError(f"{source}: unknown setting: {name}.{field}")
             allowed[field] = value
 
-    # Zero is a documented TOML sentinel for scheduler-derived CPU counts.
+    # zero is the TOML sentinel for scheduler-derived CPU counts
     threads = config["pipeline"]["threads"]
     if threads == 0:
         config["pipeline"]["threads"] = _scheduler_threads()
@@ -341,7 +341,7 @@ def load(path: str | Path, *, protein_mode: bool = False) -> dict[str, Any]:
 
 
 def as_flag(value: Any) -> str:
-    """Normalise legacy on/off and flag values for command-line use."""
+    """normalise legacy on/off and flag values for command-line use"""
     text = str(value).lower()
     if text not in _BOOLEAN_TEXT:
         raise ConfigError(f"unsupported legacy flag value: {value!r}")

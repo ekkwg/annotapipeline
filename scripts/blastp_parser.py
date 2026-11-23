@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the two-pass similarity analysis from the legacy command line."""
+"""run the two-pass similarity analysis from the command line"""
 
 from __future__ import annotations
 

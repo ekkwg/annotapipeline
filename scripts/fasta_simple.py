@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for joining FASTA sequences with annotations."""
+"""write annotated protein FASTA without GFF coordinates"""
 
 import warnings
 
@@ -23,7 +23,7 @@ def main(
 
     from Bio import SeqIO
 
-    # ============== Write fasta file with new header ==========================
+    # write annotated sequences with the configured organism
 
     ids_warn = []
     with open(f"AnnotaPipeline_{basename!s}_proteins.fasta", "w") as out:
@@ -34,7 +34,7 @@ def main(
             record.description = f"| Organism: {org} | Description: {ant[record.id]}"
             SeqIO.write([record], out, "fasta-2line")
 
-    # =============== Warning message, if something goes wrong =====================
+    # report identifiers missing from the annotation table
 
     if len(ids_warn) > 0:
         warnings.warn(

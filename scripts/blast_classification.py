@@ -1,4 +1,4 @@
-"""BLAST/DIAMOND invocation and annotation classification shared by runners."""
+"""run sequence searches and classify their tabular hits"""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def blast_command(
     cpus: int,
     aligner: str = "blast",
 ) -> list[str]:
-    """Build the tabular search command for BLAST+ or DIAMOND."""
+    """build the tabular search command for BLAST+ or DIAMOND"""
     cpus = max(int(cpus), 1)
     if aligner == "blast":
         return [
@@ -46,9 +46,8 @@ def blast_command(
             str(cpus),
         ]
     if aligner == "diamond":
-        # DIAMOND requires outfmt fields as separate arguments and lacks
-        # BLAST's sacc/qcovs fields; sseqid fills the unused accession column
-        # and qcovhsp fills the coverage column.
+        # DIAMOND takes each outfmt field as a separate argument. It has no
+        # sacc/qcovs, so sseqid and qcovhsp fill those two columns.
         return [
             str(executable),
             "blastp",
@@ -80,7 +79,7 @@ def blast(
     cpus: int,
     aligner: str = "blast",
 ) -> None:
-    """Run a tabular protein search, writing an empty table for no query."""
+    """run a tabular search, writing an empty table for no query"""
     if not Path(query).stat().st_size:
         Path(output).write_text("")
         return
@@ -102,7 +101,7 @@ def blast(
 def description(
     title: str, db_format: str, separator: str = "|", column: int = 5
 ) -> str:
-    """Extract a product description from a subject title."""
+    """extract a product description from a subject title"""
     if db_format == "nrdb":
         match = re.search(r"\s(.*?)\s\[.*", title)
         return (match.group(1) if match else title).strip()
@@ -114,7 +113,7 @@ def description(
 
 
 def candidates(hits: str | Path, db_format: str, settings: dict[str, Any]):
-    """Yield accepted (bitscore, description) pairs grouped by query ID."""
+    """yield accepted (bitscore, description) pairs grouped by query ID"""
     keywords = [word.lower() for word in settings["keywords"]]
 
     def rows(source):
@@ -145,7 +144,7 @@ def candidates(hits: str | Path, db_format: str, settings: dict[str, Any]):
 
 
 def write_candidate(query, accepted, products, report) -> None:
-    # max retains the first hit for equal bit scores
+    # max keeps the first hit when bit scores tie
     best = max(accepted, key=lambda hit: hit[0])[1]
     titles = ";".join(title for _, title in accepted)
     products.write(f"{query}\t{best}\n")
@@ -155,7 +154,7 @@ def write_candidate(query, accepted, products, report) -> None:
 def process_swiss(
     basename: str, protein_seq: str | Path, hits: str | Path, settings: dict
 ) -> None:
-    """Select accepted SwissProt products and write the unresolved FASTA."""
+    """select SwissProt products and write the unresolved FASTA"""
     accepted_ids = []
     with (
         open(f"{basename}_annotated_products.txt", "w") as products,
@@ -183,7 +182,7 @@ def process_secondary(
     db_format: str,
     settings: dict,
 ) -> None:
-    """Classify second-pass hits and write the no-hit protein list."""
+    """classify second-pass hits and write the no-hit protein list"""
     seen = set()
     with (
         open(f"{basename}_hypothetical_products.txt", "w") as hypothetical,

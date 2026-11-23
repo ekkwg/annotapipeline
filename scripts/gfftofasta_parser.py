@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Legacy CLI for writing GFF information into FASTA headers."""
+"""write GFF coordinates and annotations into FASTA headers"""
 
 import warnings
 
@@ -38,9 +38,9 @@ def main(
     trans = parse_gff_transcripts(str(gff))
     ant = parse_annotations(str(annot))
 
-    # ============== Write fasta file with new header ==========================
+    # write annotated sequences with GFF coordinates
 
-    # Remove quotes from organism
+    # strip quotes from the configured organism
     organism = str(org).replace('"', "").replace("'", "")
 
     with open(f"AnnotaPipeline_{basename!s}_proteins.fasta", "w") as annotafile:
@@ -58,10 +58,10 @@ def main(
                 )
                 annotafile.write("".join(sequence))
             except Exception:
-                # warn ignored, user will be informed all at once
+                # collect failures and report them once
                 ids_warn.append(header)
 
-    # =============== Warning message, if something goes wrong =====================
+    # report identifiers missing from the GFF or annotation table
 
     if len(ids_warn) > 0:
         warnings.warn(
