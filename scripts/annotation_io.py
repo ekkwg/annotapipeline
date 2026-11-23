@@ -5,47 +5,50 @@ from pathlib import Path
 
 
 def sequence_cleaner(fasta_file, min_length=0, output_file=None):
+    """Write records meeting the minimum length, preserving input order."""
     from Bio import SeqIO
 
-    with open(output_file or f"Clear_{fasta_file}", "w") as output:
+    destination = output_file or f"Clear_{Path(fasta_file).name}"
+    with open(destination, "w") as output:
         for record in SeqIO.parse(fasta_file, "fasta"):
             if len(record.seq) >= min_length:
                 output.write(f">{record.id}\n{str(record.seq).upper()}\n")
+    return Path(destination)
 
 
 def fasta_fetcher(input_fasta, id_list, fetcher_output):
+    """Write FASTA records whose identifiers exactly match ``id_list``."""
     from Bio import SeqIO
 
-    wanted = sorted(set(id_list))
-    # keep legacy matching until transcript/protein identity is characterised
-    records = (
-        seq
-        for seq in SeqIO.parse(input_fasta, "fasta")
-        for wanted_id in wanted
-        if wanted_id in seq.id
-    )
-    if SeqIO.write(records, fetcher_output, "fasta") < len(wanted):
-        logging.getLogger(__name__).info("IDs not found in input FASTA file")
+    wanted = set(id_list)
+    with SeqIO.parse(input_fasta, "fasta") as source:
+        records = (record for record in source if record.id in wanted)
+        written = SeqIO.write(records, fetcher_output, "fasta")
+    if written != len(wanted):
+        logging.getLogger(__name__).warning(
+            f"{written} of {len(wanted)} requested FASTA IDs found in {input_fasta}"
+        )
+    return written
 
 
 def annotate_codingseq(aa_fasta, codingseq_fasta, basename):
+    """Transfer protein annotations to coding sequences by exact ID."""
     from Bio import SeqIO
 
-    with open(aa_fasta) as proteins:
-        headers = [
-            line.strip().replace(">", "") for line in proteins if ">" in line
-        ]
-    annotations = {header.split("|")[0].strip(): header for header in headers}
-    records = SeqIO.to_dict(SeqIO.parse(codingseq_fasta, "fasta"))
-
-    with open(f"AnnotaPipeline_{basename}_transcripts.fasta", "w") as output:
-        for key, record in records.items():
-            for protein_id, header in annotations.items():
-                if protein_id in key:
-                    record.id = header
-                    record.description = ""
-                    record.seq = record.seq.upper()
-                    SeqIO.write(record, output, "fasta-2line")
+    with SeqIO.parse(aa_fasta, "fasta") as source:
+        annotations = {record.id: record.description for record in source}
+    output = Path(f"AnnotaPipeline_{basename}_transcripts.fasta")
+    with (
+        output.open("w") as handle,
+        SeqIO.parse(codingseq_fasta, "fasta") as source,
+    ):
+        for record in source:
+            if record.id not in annotations:
+                continue
+            record.description = annotations[record.id]
+            record.seq = record.seq.upper()
+            SeqIO.write(record, handle, "fasta-2line")
+    return output
 
 
 def add_features(feature, data, save):
@@ -85,9 +88,7 @@ def aggregate_proteomics(parsed_files, output_file):
     # retain legacy counting, including indices and spectrum identifiers
     total = add_features("Peptide", data, pd.DataFrame())
     total = add_features("Spectrum", data, total)
-    total = total.fillna(0).astype(
-        {"Unique Peptide": int, "Unique Spectrum": int}
-    )
+    total = total.fillna(0).astype({"Unique Peptide": int, "Unique Spectrum": int})
     total.sort_values(by="ProteinID", ascending=False).to_csv(
         output_file, sep="\t", index=False
     )

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Legacy CLI for filtering Percolator output by q-value."""
 
 import sys
@@ -66,9 +67,7 @@ def main(
                 elif protein_id not in dict_write:
                     dict_write[f"{protein_id}"] = [f"{peptide}\t{spectrum}\n"]
                 else:
-                    dict_write[f"{protein_id}"].append(
-                        f"{peptide}\t{spectrum}\n"
-                    )
+                    dict_write[f"{protein_id}"].append(f"{peptide}\t{spectrum}\n")
         else:
             # If list contains only one element, get this guy
             only_id = all_ids[0]
@@ -83,7 +82,7 @@ def main(
     with open(f"{basename}_parsed.tsv", "w") as output:
         output.write("ProteinID\tPeptide\tSpectrum\n")
         for key in sorted(dict_write.keys()):
-            info = dict_write.get(key)
+            info = dict_write[key]
             for peptide in info:
                 output.write(f"{key}\t{''.join(peptide)}")
 

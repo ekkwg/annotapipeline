@@ -1,0 +1,84 @@
+# Worked example. Replace paths and organism values before use.
+# Diagnostics are disabled by leaving kallisto-exe/comet-exe empty.
+
+[pipeline]
+python = "/usr/bin/python3"
+perl = "/usr/bin/perl"
+threads = 0
+organism = "Arabidopsis thaliana"
+basename = "Athaliana"
+keywords = [
+    "fragment",
+    "hypothetical",
+    "partial",
+    "uncharacterized",
+    "unknown",
+    "unspecified",
+]
+
+[databases]
+swissprot-db = "/bases_externas/SwissProt_11_2019/uniprot_sprot.fasta"
+secondary-db = "/bases_externas/NR_Subset_Athaliana_Prot.fasta"
+secondary-format = "nrdb"
+customsep = "|"
+customcolumn = 5
+cdd-db = "/bases_externas/interproscan-5.52-86.0/data/cdd/3.18/db/Cdd_NCBI"
+pfam = "/bases_externas/interproscan-5.52-86.0/data/pfam/33.1/pfam_a.hmm"
+
+[augustus]
+augustus-path = "conda"
+strand = "both"
+genemodel = "intronless"
+species = "arabidopsis thaliana"
+protein = "on"
+introns = "on"
+start = "on"
+stop = "on"
+cds = "on"
+
+[augustus_optional]
+hintsfile = ""
+extrinsicCfgFile = ""
+UTR = ""
+
+[seq_cleaner]
+minsize-seq = 0
+
+[local_aligner]
+aligner = "blast"  # blast or diamond; blast-exe is the selected executable
+blast-exe = "blastp"
+evalue = 1e-5
+identity = 40
+positivity = 60
+coverage = 30
+max_target_seqs = 10
+
+[rpsblast]
+rpsblast-exe = "rpsblast"
+evalue = 1e-5
+max_target_seqs = 10
+
+[interproscan]
+interproscan-exe = "/home/opt/interproscan.sh"
+# Omit ms unless a minimum nucleotide size is required.
+
+[hmmer]
+hmmscan-exe = "hmmscan"
+E = 1e-5
+domE = 1e-5
+
+[kallisto]
+kallisto-exe = ""
+rna-seq = []
+# Omit l/s unless required by single-end reads or paired-end tuning.
+threshold = "mean"
+bootstrap = 0
+
+[proteomics]
+comet-exe = ""
+comet-params = ""
+comet-spectrometry = ""
+comet-ext = ""
+# Omit first/last to keep the values from comet.params.
+percolator-exe = "percolator"
+percolator-qvalue = 0.05

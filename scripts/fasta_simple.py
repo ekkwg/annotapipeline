@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 """Legacy CLI for joining FASTA sequences with annotations."""
 
 import warnings
 
 import typer
+from sequence_utils import read_annotation_table
 
 app = typer.Typer(
     add_completion=False,
@@ -17,36 +19,20 @@ def main(
     seqs: str = typer.Option(..., "-faf", "--fasta"),
     org: str = typer.Option(..., "-org", "--organism"),
 ) -> None:
-    # Info from annotation will be stored here
-    ant = {}
+    ant = read_annotation_table(annot)
 
-    # ============================= Extract annotations ==========================
-
-    with open(annot) as source:
-        annotation_lines = source.read().splitlines()
-    for line in annotation_lines:
-        line = line.split("\t")
-        ant[line[0]] = line[1]
-
-    with open(seqs) as source:
-        fasta = source.read().split(">")
-    del fasta[0]  # remove empty value
+    from Bio import SeqIO
 
     # ============== Write fasta file with new header ==========================
 
-    ids_warn = []  # store ids with no annotation
+    ids_warn = []
     with open(f"AnnotaPipeline_{basename!s}_proteins.fasta", "w") as out:
-        for sequence in fasta:
-            sequence = sequence.split("\n")
-            sequence_id = sequence[0]
-            try:
-                out.write(
-                    f">{sequence_id!s} | Organism: {org!s} | "
-                    f"Description: {ant[sequence_id]!s}\n"
-                )
-                out.write(str("\n".join(sequence[1:])))
-            except Exception:
-                ids_warn.append(sequence_id)
+        for record in SeqIO.parse(seqs, "fasta"):
+            if record.id not in ant:
+                ids_warn.append(record.id)
+                continue
+            record.description = f"| Organism: {org} | Description: {ant[record.id]}"
+            SeqIO.write([record], out, "fasta-2line")
 
     # =============== Warning message, if something goes wrong =====================
 
@@ -57,9 +43,7 @@ def main(
         )
         with open(f"{basename!s}_ids_with_no_annotations.txt", "w") as warn_seq:
             warn_seq.writelines(str(a) + "\n" for a in ids_warn)
-        warnings.warn(
-            "INFO: IDs stored in ids_with_no_annotations.txt", stacklevel=2
-        )
+        warnings.warn("INFO: IDs stored in ids_with_no_annotations.txt", stacklevel=2)
 
 
 if __name__ == "__main__":

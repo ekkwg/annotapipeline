@@ -1,0 +1,85 @@
+# Canonical configuration for the legacy AnnotaPipeline runner.
+# Replace all /full/path/to/... values before running an analysis.
+# For Nextflow parameters, use a JSON -params-file (see docs/nextflow.md).
+
+[pipeline]
+python = "python3"
+perl = "perl"
+threads = 0  # 0 reads SLURM_CPUS_PER_TASK/NSLOTS, then falls back to 1
+organism = ""
+basename = ""
+keywords = [
+    "fragment",
+    "hypothetical",
+    "partial",
+    "uncharacterized",
+    "unknown",
+    "unspecified",
+]
+
+[databases]
+swissprot-db = "/full/path/to/uniprot_sprot.fasta"
+secondary-db = ""
+secondary-format = "nrdb"
+customsep = "|"
+customcolumn = 5
+cdd-db = "/full/path/to/Cdd"
+pfam = "/full/path/to/Pfam-A.hmm"
+
+[augustus]
+augustus-path = "conda"
+strand = "both"
+genemodel = "partial"
+species = ""
+protein = "on"
+introns = "on"
+start = "on"
+stop = "on"
+cds = "on"
+
+[augustus_optional]
+hintsfile = ""
+extrinsicCfgFile = ""
+UTR = ""
+
+[seq_cleaner]
+minsize-seq = 0
+
+[local_aligner]
+aligner = "blast"  # blast or diamond; blast-exe is the selected executable
+blast-exe = "blastp"
+evalue = 1e-5
+identity = 40
+positivity = 60
+coverage = 30
+max_target_seqs = 10
+
+[rpsblast]
+rpsblast-exe = "rpsblast"
+evalue = 1e-5
+max_target_seqs = 10
+
+[interproscan]
+interproscan-exe = "interproscan.sh"
+# Omit ms unless a minimum nucleotide size is required.
+
+[hmmer]
+hmmscan-exe = "hmmscan"
+E = 1e-5
+domE = 1e-5
+
+[kallisto]
+kallisto-exe = ""
+rna-seq = []
+# Omit l/s unless required by single-end reads or paired-end tuning.
+threshold = "mean"
+bootstrap = 0
+
+[proteomics]
+comet-exe = ""
+comet-params = ""
+comet-spectrometry = ""
+comet-ext = ""
+# Omit first/last to keep the values from comet.params.
+percolator-exe = "percolator"
+percolator-qvalue = 0.05

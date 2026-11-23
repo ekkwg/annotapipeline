@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 """Legacy CLI for merging annotation sources into product tables."""
 
 import os
 import os.path
+from pathlib import Path
 
 import typer
 
@@ -19,6 +21,9 @@ def main(
     nohit: str = typer.Option(..., "-nh", "--no_hit"),
     hypo: str = typer.Option(..., "-hy", "--hypothetical"),
 ) -> None:
+    hypo_ids: list[str] = []
+    nohit_ids: list[str] = []
+
     def temporary_query(arq):
         # temporary adding a line to the BLAST analysis
         #   so it accounts for the last query found by the BLAST algorithm
@@ -73,17 +78,11 @@ def main(
                                         "Ontology_term=", ""
                                     )
                                 if "signature_" in a:
-                                    anotacao_db = a.replace(
-                                        "signature_desc=", ""
-                                    )
+                                    anotacao_db = a.replace("signature_desc=", "")
                                 if "Name" in a:
-                                    name = a.replace('"', "").replace(
-                                        "Name=", ""
-                                    )
+                                    name = a.replace('"', "").replace("Name=", "")
                                 if "Dbxref" in a:
-                                    interpro = a.replace('"', "").replace(
-                                        "Dbxref=", ""
-                                    )
+                                    interpro = a.replace('"', "").replace("Dbxref=", "")
                             ipr.write(
                                 f"{nome_subject}\t{db_certo}\t{name}\t"
                                 f"{evalue}\t{anotacao_db}\t{interpro}\t"
@@ -97,10 +96,10 @@ def main(
         if len(ids_dict.keys()) > 0:
             for anot in ids_dict:
                 output.write(f"{anot}\t{str(ids_dict.get(anot)).strip()}\n")
-        if len(hypo) > 0:
-            output.writelines(f"{hyp}\thypothetical protein\n" for hyp in hypo)
-        if len(nohit) > 0:
-            output.writelines(f"{hyp}\thypothetical protein\n" for hyp in nohit)
+        if len(hypo_ids) > 0:
+            output.writelines(f"{hyp}\thypothetical protein\n" for hyp in hypo_ids)
+        if len(nohit_ids) > 0:
+            output.writelines(f"{hyp}\thypothetical protein\n" for hyp in nohit_ids)
 
     # Function to join IPRs and GOs from InterproScan with IDs hypothetical or without hits
     def intepro_process(ids_dict):
@@ -143,12 +142,10 @@ def main(
                             f"{old_id}\t{str(ids_dict.get(old_id)).strip()} ({','.join(go_list)!s})\n"
                         )
                     else:
-                        output.write(
-                            f"{old_id}\t{str(ids_dict.get(old_id)).strip()}\n"
-                        )
+                        output.write(f"{old_id}\t{str(ids_dict.get(old_id)).strip()}\n")
                     del ids_dict[old_id]
                 # Else, interpro_result must be in hypothetical
-                elif old_id in hypo:
+                elif old_id in hypo_ids:
                     if (len(ipr_list) > 0) and (len(go_list) > 0):
                         output.write(
                             f"{old_id}\thypothetical protein ({','.join(ipr_list)!s},{','.join(go_list)!s})\n"
@@ -163,7 +160,7 @@ def main(
                         )
                     else:
                         output.write(f"{old_id}\thypothetical protein\n")
-                    hypo.remove(old_id)
+                    hypo_ids.remove(old_id)
                 else:
                     if (len(ipr_list) > 0) and (len(go_list) > 0):
                         output.write(
@@ -179,7 +176,7 @@ def main(
                         )
                     else:
                         output.write(f"{old_id}\thypothetical protein\n")
-                    nohit.remove(old_id)
+                    nohit_ids.remove(old_id)
                 go_list.clear()
                 ipr_list.clear()
                 # GET FIRST ITEM FOR NEW ID - After save old
@@ -200,6 +197,7 @@ def main(
         write_no_ipr(ids_dict)
         os.remove("Interpro_out_tmp.txt")
 
+    Path("Interpro_out_tmp.txt").unlink(missing_ok=True)
     # ---------------------- Create organized file with iprs and gos -----------------------
     if (os.path.getsize(ipr1) == 0) and (os.path.getsize(ipr2) == 0):
         # Can't process empty file
@@ -217,7 +215,9 @@ def main(
     ids = []
     desc = []
     for anot in annotation_lines:
-        anot = anot.split("\t")
+        anot = anot.split("\t", 1)
+        if len(anot) != 2:
+            continue
         ids.append(anot[0])
         desc.append(anot[1])
 
@@ -228,15 +228,11 @@ def main(
     # ---------------------- Create list with hypothetical ids -----------------
     if os.path.getsize(hypo) != 0:
         with open(hypo) as source:
-            hypo = source.read().splitlines()
-    else:
-        hypo = []
+            hypo_ids = source.read().splitlines()
     # ---------------------- Create list with no_hits ids -----------------
     if os.path.getsize(nohit) != 0:
         with open(nohit) as source:
-            nohit = source.read().splitlines()
-    else:
-        nohit = []
+            nohit_ids = source.read().splitlines()
 
     with open("All_annotation_products.txt", "w") as output:
         if os.path.isfile("Interpro_out_tmp.txt") and os.path.getsize(

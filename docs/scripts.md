@@ -11,8 +11,11 @@ working directory, which Nextflow sets to the task directory.
 | --- | --- |
 | `annota_task.py` | Task adapter invoked by Nextflow modules |
 | `annotation_io.py` | FASTA cleaning, ID fetching, transcript headers, peptide counts |
-| `blast_classification.py` | BLAST hit filtering and product partitioning |
-| `annotapipeline.py` | Direct CLI driver for the YAML configuration |
+| `blast_classification.py` | BLAST/DIAMOND command building, hit filtering and product partitioning |
+| `config.py` | TOML schema, validation and legacy flag normalisation |
+| `logging_utils.py` | Shared logging setup and stderr redirection |
+| `sequence_utils.py` | GFF3 and annotation-table helpers shared by parsers |
+| `annotapipeline.py` | Direct CLI driver for TOML configuration |
 | `blastp_parser.py` | Two-pass BLAST search and classification |
 | `fasta_simple.py` | FASTA headers from an annotation table without a GFF |
 | `fastatogff.py` | Annotation transfer into an AUGUSTUS GFF3 file |
@@ -35,7 +38,7 @@ Typer validates required options and exits with status 2 on malformed input.
 
 | Script | Required flags | Optional flags | Outputs |
 | --- | --- | --- | --- |
-| `blastp_parser.py` | `-s`, `-sp`, `-basename`, `-blastp`, one of `-nr`, `-trbl`, `-spdb` | `-id`, `-pos`, `-cov`, `-kw`, `-t`, `-max_target_seqs`, `-evalue`, `-customsep`, `-customcolumn` | `<basename>_annotated_products.txt`, `<basename>_hypothetical_products.txt`, `<basename>_no_hit_products.txt`, two annotation reports, unresolved protein FASTA |
+| `blastp_parser.py` | `-s`, `-sp`, `-basename`, `-blastp`, one of `-nr`, `-trbl`, `-spdb` | `-aligner`, `-id`, `-pos`, `-cov`, `-kw`, `-t`, `-max_target_seqs`, `-evalue`, `-customsep`, `-customcolumn` | `<basename>_annotated_products.txt`, `<basename>_hypothetical_products.txt`, `<basename>_no_hit_products.txt`, two annotation reports, unresolved protein FASTA, two TSV hit tables |
 | `fasta_simple.py` | `-annot`, `-b`, `-faf`, `-org` | | `AnnotaPipeline_<basename>_proteins.fasta`, `<basename>_ids_with_no_annotations.txt` |
 | `gfftofasta_parser.py` | `-gff`, `-annot`, `-b`, `-faf`, `-org` | | `AnnotaPipeline_<basename>_proteins.fasta`, `<basename>_ids_with_no_annotations.txt` |
 | `fastatogff.py` | `-gff`, `-all`, `-b` | | `<basename>_Annotated_GFF.gff` |
@@ -45,8 +48,10 @@ Typer validates required options and exits with status 2 on malformed input.
 | `percolator_parser.py` | `-p`, `-b` | `-qv` | `<basename>_qvalue_filtered.tsv`, `<basename>_parsed.tsv` |
 | `summary_parser.py` | `-b`, `-annot`, `-ipr_annot`, `-ipr_hyp` | `-tr`, `-proteomics` | `AnnotaPipeline_<basename>_Summary.tsv` |
 
-The direct driver uses `annotapipeline.py -c annotapipeline.yaml` with `-s`,
-`-p`, or `-p` plus `-gff`. See the [runner instructions](../README.md#how-to-run).
+The direct driver uses `annotapipeline.py -c config/annotapipeline.toml` with
+`-s`, `-p`, or `-p` plus `-gff`. YAML application configuration is no longer
+accepted; see [configuration migration](../config/migration.md) for a one-off
+conversion and the [runner instructions](../README.md#how-to-run).
 
 ## Task adapter
 
@@ -72,6 +77,9 @@ peptide or spectrum counts.
   `# start gene `.
 - Annotation tables are tab-separated with an identifier in column 1 and a
   description in column 2. `fastatogff.py` splits on the first tab only.
+- Similarity hit tables are nine-column TSV files. BLAST+ emits
+  `qseqid sseqid sacc bitscore evalue ppos pident qcovs stitle`; DIAMOND emits
+  `qseqid sseqid sseqid bitscore evalue ppos pident qcovhsp stitle`.
 - Protein FASTA headers written by the parsers have the form
   `>ID | Organism: <organism> | Description: <annotation>`.
 - Kallisto input is the tab-separated `abundance.tsv` with a `tpm` column.
@@ -83,8 +91,9 @@ peptide or spectrum counts.
 
 ## Development
 
-Python 3.12 is provided by the Pixi environment. Formatting and linting use
-Ruff with the settings in `ruff.toml`:
+Python 3.12 is provided by the Pixi environment. Formatting and style use
+Ruff with the settings in `ruff.toml`; `ty` uses `ty.toml` to resolve the
+flat `scripts/` module layout:
 
 ```bash
 pixi run --locked format
@@ -92,6 +101,8 @@ pixi run --locked lint
 pixi run --locked test
 ```
 
-Command contracts are covered by `tests/test_cli.py`; workflow behaviour is
-covered by `tests/test_workflow.py` with fixture tools. See
-[`nextflow.md`](nextflow.md) for reference staging and execution profiles.
+Command contracts are covered by `tests/test_cli.py`, configuration loading
+by `tests/test_config.py`, parser invariants by `tests/test_parsers.py`, the
+direct runner by `tests/test_runner.py`, and workflow behaviour by
+`tests/test_workflow.py` with fixture tools. See [`nextflow.md`](nextflow.md)
+for reference staging and execution profiles.

@@ -11,7 +11,7 @@ process BLASTP {
     val opts
 
     output:
-    path "${base}_BLASTp_AAvs${database}.outfmt6"
+    path "${base}_BLASTp_AAvs${database}.tsv"
 
     script:
     """
@@ -54,7 +54,7 @@ process PARSE_SECONDARY {
     val opts
 
     output:
-    path "${base}_annotated_products.txt", emit: annotated
+    path "${base}_All_annotated_products.txt", emit: annotated
     path "${base}_hypothetical_products.txt", emit: hypothetical
     path "${base}_no_hit_products.txt", emit: no_hit
     path "${base}_SpecifiedDB_annotations.txt", emit: report

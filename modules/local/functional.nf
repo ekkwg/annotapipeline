@@ -47,7 +47,7 @@ process RPSBLAST {
     val opts
 
     output:
-    path "${base}_rpsblast_output.outfmt6"
+    path "${base}_rpsblast_output.tsv"
 
     script:
     """

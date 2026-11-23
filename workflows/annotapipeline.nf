@@ -64,8 +64,9 @@ workflow ANNOTATE {
           payload(common + [min_length: cfg.min_length]))
 
     def b = cfg.blast
-    def search = common + [exe: cfg.tools.blastp, evalue: b.evalue,
-                           max_targets: b.max_targets]
+    def searchExe = b.aligner == 'diamond' ? cfg.tools.diamond : cfg.tools.blastp
+    def search = common + [exe: searchExe, aligner: b.aligner,
+                           evalue: b.evalue, max_targets: b.max_targets]
     def classify = common + [identity: b.identity, positivity: b.positivity,
                              coverage: b.coverage, keywords: b.keywords]
     BLAST_SWISSPROT(adapter, classifier, CLEAN.out, refs.swissprot.directory, base,

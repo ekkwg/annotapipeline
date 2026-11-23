@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from tool_fixture import PROTEINS
 
@@ -32,9 +33,10 @@ class WorkflowTest(unittest.TestCase):
 
         tool_dir = self.root / "tools"
         tool_dir.mkdir()
-        self.tools = {}
+        self.tools: dict[str, str] = {}
         for tool in (
             "blastp",
+            "diamond",
             "rpsblast",
             "hmmscan",
             "augustus",
@@ -63,7 +65,7 @@ class WorkflowTest(unittest.TestCase):
             (bundle / "SHA256SUMS").write_text(f"{key} fixture reference\n")
             refs[key] = {"directory": str(bundle), "entry": entry}
 
-        self.config = {
+        self.config: dict[str, Any] = {
             "basename": "fixture",
             "organism": "Model plant",
             "software_id": "fixture-tools-v1",
@@ -100,9 +102,7 @@ class WorkflowTest(unittest.TestCase):
         if resume:
             command.append("-resume")
         env = dict(os.environ, NXF_OFFLINE="true")
-        env["PATH"] = (
-            str(Path(sys.executable).parent) + os.pathsep + env["PATH"]
-        )
+        env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + env["PATH"]
         proc = subprocess.run(
             command,
             cwd=self.root,
@@ -133,9 +133,7 @@ class WorkflowTest(unittest.TestCase):
     def test_protein_only_and_reference_resume(self):
         out, _, _ = self.invoke("original")
         annotations = (out / "All_Annotated_Products.txt").read_text()
-        assert (
-            "geneA\tFirst enzyme (InterPro:IPR000001,GO:0000001)" in annotations
-        )
+        assert "geneA\tFirst enzyme (InterPro:IPR000001,GO:0000001)" in annotations
         assert "geneB\tCatalytic B\n" in annotations
         assert "geneC\thypothetical protein" in annotations
         assert "geneD\thypothetical protein\n" in annotations
@@ -145,15 +143,24 @@ class WorkflowTest(unittest.TestCase):
         repeat, trace, _ = self.invoke("repeat", resume=True)
         assert self.trace_status(trace, "BLAST_SWISSPROT") == ["CACHED"]
         assert self.trace_status(trace, "SUMMARY") == ["CACHED"]
-        assert (
-            annotations == (repeat / "All_Annotated_Products.txt").read_text()
-        )
+        assert annotations == (repeat / "All_Annotated_Products.txt").read_text()
 
         (self.root / "cdd" / "SHA256SUMS").write_text("updated manifest\n")
         _, trace, _ = self.invoke("updated", resume=True)
         assert self.trace_status(trace, "RPSBLAST") == ["COMPLETED"]
         assert self.trace_status(trace, "HMMSCAN") == ["CACHED"]
         assert self.trace_status(trace, "SUMMARY") == ["CACHED"]
+
+    def test_diamond_aligner(self):
+        self.config["blast"] = {"aligner": "diamond"}
+        self.config["tools"]["diamond"] = self.tools["diamond"]
+        out, _, _ = self.invoke("diamond")
+        assert (
+            "geneA\tFirst enzyme (InterPro:IPR000001,GO:0000001)\n"
+            in (out / "All_Annotated_Products.txt").read_text()
+        )
+        assert (out / "fixture_BLASTp_AAvsSwissProt.tsv").is_file()
+        assert not list(out.glob("*.outfmt6"))
 
     def test_genome_and_both_omics(self):
         del self.config["protein"]
@@ -174,15 +181,12 @@ class WorkflowTest(unittest.TestCase):
         out, _, _ = self.invoke("genome")
         proteins = (out / "AnnotaPipeline_fixture_proteins.fasta").read_text()
         assert "Strand: -" in proteins
-        transcripts = (
-            out / "AnnotaPipeline_fixture_transcripts.fasta"
-        ).read_text()
+        transcripts = (out / "AnnotaPipeline_fixture_transcripts.fasta").read_text()
         assert "ATGGCTGCTGCT" in transcripts
         assert (out / "fixture_Annotated_GFF.gff").is_file()
         with (out / "AnnotaPipeline_fixture_Summary.tsv").open() as handle:
             rows = {
-                row["ProteinID"]: row
-                for row in csv.DictReader(handle, delimiter="\t")
+                row["ProteinID"]: row for row in csv.DictReader(handle, delimiter="\t")
             }
         assert rows["geneA"]["TPM"] == "9.0"
         assert rows["geneA"]["Total_Peptide"] == "2"
@@ -210,8 +214,7 @@ class WorkflowTest(unittest.TestCase):
         out, _, _ = self.invoke("single")
         with (out / "AnnotaPipeline_fixture_Summary.tsv").open() as handle:
             rows = {
-                row["ProteinID"]: row
-                for row in csv.DictReader(handle, delimiter="\t")
+                row["ProteinID"]: row for row in csv.DictReader(handle, delimiter="\t")
             }
         assert rows["geneA"]["TPM"] == "9.0"
 

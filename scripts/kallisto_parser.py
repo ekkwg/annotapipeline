@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Legacy CLI for filtering Kallisto output by a TPM threshold."""
 
 from pathlib import Path

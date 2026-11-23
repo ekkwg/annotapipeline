@@ -83,8 +83,8 @@ class CliTest(unittest.TestCase):
 
     def test_legacy_runner_requires_exactly_one_input(self):
         for args in (
-            ("-c", "config.yaml"),
-            ("-s", "seq.fa", "-p", "prot.fa", "-c", "config.yaml"),
+            ("-c", "config.toml"),
+            ("-s", "seq.fa", "-p", "prot.fa", "-c", "config.toml"),
         ):
             with self.subTest(args=args):
                 proc = self.run_script("annotapipeline.py", *args)

@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 """Legacy CLI for writing GFF information into FASTA headers."""
 
-import re
 import warnings
 
 import typer
+from sequence_utils import parse_annotations, parse_gff_transcripts
 
 app = typer.Typer(
     add_completion=False,
@@ -34,36 +35,8 @@ def main(
         if header is not None:
             yield header, lines
 
-    # Info from transcript products will be stored here
-    trans = {}
-    # Info from annotation will be stored here
-    ant = {}
-
-    # ============================= Extract info from gff =========================
-    with open(str(gff)) as source:
-        for line in source:
-            if "\ttranscript\t" not in line:
-                continue
-            fields = line.rstrip("\r\n").split("\t")
-            if len(fields) < 9:
-                continue
-            # use regex to remove ID= and ;PARENT from annotation ID in gff AUGUSTUS output
-            id_store = re.sub(r";.*", "", fields[-1])
-            id_store = re.sub(r".*=", "", id_store)
-            trans[id_store] = {
-                "scaff": str(fields[0]),
-                "start": str(fields[3]),
-                "end": str(fields[4]),
-                "strand": str(fields[6]),
-            }
-
-    # ============================= Extract annotations ==========================
-
-    with open(str(annot)) as source:
-        for line in source:
-            fields = line.rstrip("\r\n").split("\t", 1)
-            if len(fields) == 2:
-                ant[fields[0]] = fields[1]
+    trans = parse_gff_transcripts(str(gff))
+    ant = parse_annotations(str(annot))
 
     # ============== Write fasta file with new header ==========================
 
@@ -98,9 +71,7 @@ def main(
         with open(f"{basename!s}_ids_with_no_annotations.txt", "w") as warn_seq:
             for header in ids_warn:
                 warn_seq.write(str(header) + "\n")
-        warnings.warn(
-            "INFO: IDs stored in ids_with_no_annotations.txt", stacklevel=2
-        )
+        warnings.warn("INFO: IDs stored in ids_with_no_annotations.txt", stacklevel=2)
 
 
 if __name__ == "__main__":

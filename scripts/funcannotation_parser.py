@@ -1,11 +1,12 @@
+#!/usr/bin/env python3
 """Legacy CLI for parsing InterProScan, HMMER and RPSBLAST output."""
 
 import logging
-import os
 import re
-import sys
+from pathlib import Path
 
 import typer
+from logging_utils import configure, redirect_stderr
 
 app = typer.Typer(
     add_completion=False,
@@ -21,49 +22,12 @@ def main(
     rpsblast: str = typer.Option(..., "-rpsblast"),
     basename: str = typer.Option(..., "-basename"),
 ) -> None:
-    # ----------------------- Create LogFile ------------------------------------
-
-    logger = logging.getLogger("Functional Annotation")
-
-    # ----------------------Redirect STDOUT and STDERR to logfile--------------
-
-    class StreamToLogger:
-        """
-        Fake file-like stream object that redirects writes to a logger instance.
-        """
-
-        def __init__(self, logger, log_level=logging.INFO):
-            self.logger = logger
-            self.log_level = log_level
-            self.linebuf = ""
-
-        def write(self, buf):
-            temp_linebuf = self.linebuf + buf
-            self.linebuf = ""
-            for line in temp_linebuf.splitlines(True):
-                if line[-1] == "\n":
-                    self.logger.log(self.log_level, line.rstrip())
-                else:
-                    self.linebuf += line
-
-        def flush(self):
-            if self.linebuf != "":
-                self.logger.log(self.log_level, self.linebuf.rstrip())
-            self.linebuf = ""
-
-    logging.basicConfig(
+    logger = configure(
+        "FunctionalAnnotation.log",
+        name="Functional Annotation",
         level=logging.DEBUG,
-        format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
-        datefmt="%d/%m/%Y %H:%M:%S",
-        filename="FunctionalAnnotation.log",
-        filemode="a",
     )
-
-    stderr_logger = logging.getLogger("Functional Annotation")
-    sl = StreamToLogger(stderr_logger, logging.ERROR)
-    sys.stderr = sl
-
-    # --------------------------------------------------------------------------
+    redirect_stderr(logger)
 
     def parser_interproscan(arq_entrada, arq_ipr, arq_saida):
         with open(arq_entrada) as source:
@@ -91,9 +55,7 @@ def main(
                         linha = linha.split("\t")
                         name_subject = linha[0]
                         db = linha[1]
-                        if not any(
-                            unwanted in db.lower() for unwanted in db_list
-                        ):
+                        if not any(unwanted in db.lower() for unwanted in db_list):
                             correct_db = db
                             anotation = linha[-1].split(";")
                             for query in anotation:
@@ -102,13 +64,9 @@ def main(
                                         "Ontology_term=", ""
                                     )
                                 if "signature_" in query:
-                                    anotation_db = query.replace(
-                                        "signature_desc=", ""
-                                    )
+                                    anotation_db = query.replace("signature_desc=", "")
                                 if "Name" in query:
-                                    name = query.replace('"', "").replace(
-                                        "Name=", ""
-                                    )
+                                    name = query.replace('"', "").replace("Name=", "")
                                 if "Dbxref" in query:
                                     interpro = query.replace('"', "").replace(
                                         "Dbxref=", ""
@@ -146,8 +104,7 @@ def main(
                 name = fields[1]
                 interpro = str(None)
                 output.write(
-                    f"{query}\t{db}\t{name}\t{anotacao_db}\t"
-                    f"{interpro}\t{ontologia}\n"
+                    f"{query}\t{db}\t{name}\t{anotacao_db}\t{interpro}\t{ontologia}\n"
                 )
 
     def parser_rpsblast(arq_entrada, arq_rps, arq_saida):
@@ -162,10 +119,7 @@ def main(
                 anotation = hit[-1]
                 interpro = str(None)
                 ontology = str(None)
-                row = (
-                    f"{query}\t{db}\t{name}\t{anotation}\t"
-                    f"{interpro}\t{ontology}\n"
-                )
+                row = f"{query}\t{db}\t{name}\t{anotation}\t{interpro}\t{ontology}\n"
                 rps.write(row)
                 output.write(row)
 
@@ -189,9 +143,7 @@ def main(
     parser_pfam(f"Hmmscan_Out_{basename}.tsv", f"Temp_{basename}.tsv")
     logger.info("Hmmscan parser done")
     # Parse RPSblast file
-    parser_rpsblast(
-        rpsblast, f"RPSblast_Out_{basename}.tsv", f"Temp_{basename}.tsv"
-    )
+    parser_rpsblast(rpsblast, f"RPSblast_Out_{basename}.tsv", f"Temp_{basename}.tsv")
     logger.info("RPSblast parser done")
     # Group and sort
     sort_arq(
@@ -206,7 +158,7 @@ def main(
         ipr_annot, f"InterProScan_Out_{basename}.tsv", f"Temp_{basename}.tsv"
     )
     # Cleaning the house
-    os.system(f"rm Temp_{basename}.tsv")
+    Path(f"Temp_{basename}.tsv").unlink(missing_ok=True)
     logger.info("Temporary file removed")
     logger.info("Functional Annotation step is completed")
 

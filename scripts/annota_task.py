@@ -14,16 +14,21 @@ from pathlib import Path
 def run(*argv, stdout=None, cwd=None, allowed=(0,)):
     command = list(map(str, argv))
     print(f"$ {shlex.join(command)}", file=sys.stderr, flush=True)
-    result = subprocess.run(command, stdout=stdout, cwd=cwd)
+    try:
+        result = subprocess.run(command, stdout=stdout, cwd=cwd)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"external tool not found: {command[0]}") from exc
     if result.returncode not in allowed:
+        if result.returncode < 0:
+            raise RuntimeError(
+                f"tool terminated by signal {-result.returncode}: {command[0]}"
+            )
         raise subprocess.CalledProcessError(result.returncode, command)
     return result.returncode
 
 
 def parser(script, *argv, allowed=(0,)):
-    return run(
-        sys.executable, Path(__file__).parent / script, *argv, allowed=allowed
-    )
+    return run(sys.executable, Path(__file__).parent / script, *argv, allowed=allowed)
 
 
 def required(path, *, empty=False):
@@ -84,7 +89,7 @@ def clean(options, _):
 def blast_search(options, cpus):
     from blast_classification import blast
 
-    out = f"{options['basename']}_BLASTp_AAvs{options['database']}.outfmt6"
+    out = f"{options['basename']}_BLASTp_AAvs{options['database']}.tsv"
     blast(
         options["exe"],
         "query.fasta",
@@ -93,6 +98,7 @@ def blast_search(options, cpus):
         options["max_targets"],
         options["evalue"],
         cpus,
+        options.get("aligner", "blast"),
     )
 
 
@@ -106,7 +112,8 @@ def parse_secondary(options, _):
     from blast_classification import process_secondary
 
     basename = options["basename"]
-    shutil.copyfile("swiss_accepted.txt", f"{basename}_annotated_products.txt")
+    combined = f"{basename}_annotated_products.txt"
+    shutil.copyfile("swiss_accepted.txt", combined)
     process_secondary(
         basename,
         "unresolved.fasta",
@@ -114,6 +121,7 @@ def parse_secondary(options, _):
         options["db_format"],
         options,
     )
+    shutil.copyfile(combined, f"{basename}_All_annotated_products.txt")
 
 
 def partition(_, __):
@@ -204,7 +212,7 @@ def hmmscan(options, cpus):
 def rpsblast(options, cpus):
     from blast_classification import BLAST_FIELDS
 
-    out = f"{options['basename']}_rpsblast_output.outfmt6"
+    out = f"{options['basename']}_rpsblast_output.tsv"
     if not Path("query.fasta").stat().st_size:
         Path(out).write_text("")
         return
@@ -396,9 +404,7 @@ def comet_params(_, __):
 
 
 def comet(options, cpus):
-    rewrite_comet_params(
-        "prepared.params", "comet.params", {"num_threads": cpus}
-    )
+    rewrite_comet_params("prepared.params", "comet.params", {"num_threads": cpus})
     staged = next(Path("source").iterdir())
     spectrum = Path(staged.name)
     shutil.copyfile(staged, spectrum)
@@ -420,7 +426,7 @@ def comet(options, cpus):
 
 
 def percolator(options, cpus):
-    args = ["--num-threads", min(cpus, 128)]
+    args = ["--num-threads", cpus]
     if options.get("seed") is not None:
         args.extend(["--seed", options["seed"]])
     run(
@@ -460,9 +466,7 @@ def parse_psm(options, _):
             header = table.readline()
             if "q-value" not in header.split("\t") or table.readline():
                 raise ValueError("unexpected Percolator parser exit 2")
-        Path(f"{basename}_parsed.tsv").write_text(
-            "ProteinID\tPeptide\tSpectrum\n"
-        )
+        Path(f"{basename}_parsed.tsv").write_text("ProteinID\tPeptide\tSpectrum\n")
 
 
 def aggregate(options, _):

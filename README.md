@@ -19,7 +19,8 @@
   - [**Using conda**](#using-conda)
     - [**Setup AUGUSTUS species for personalized predictions**](#setup-augustus-species-for-personalized-predictions)
   - [**Manual install**](#manual-install)
-  - [**Setup `annotapipeline.yaml`**](#setup-annotapipelineyaml)
+  - [**Configure the runner**](#configure-the-runner)
+  - [**Container image**](#container-image)
 - [**How to run**](#how-to-run)
   - [**Nextflow workflow**](#nextflow-workflow)
   - [**Python runner**](#python-runner)
@@ -42,7 +43,7 @@ If you have questions, suggestions or difficulties regarding the pipeline, pleas
 
 # **Analysis description**
 
-> `annotapipeline.py` checks all required parameters in `annotapipeline.yaml` before execution
+> `annotapipeline.py` checks all required parameters in `config/annotapipeline.toml` before execution
 
 ## **1. Gene prediction**
 
@@ -59,13 +60,13 @@ Run AUGUSTUS for gene prediction, using these required arguments:
 
 You can also use these optional arguments:
 
-> Or add augustus argument below `augustus-optional:` (as described in example config file)
+> Or add AUGUSTUS arguments below `[augustus_optional]` (as described in the example config)
 
 - hintsfile
 - extrinsicCfgFile
 - UTR
 
-After gene prediction, sequences are "cleaned" based on minimal sequence size from `seq-cleaner` on `annotapipeline.yaml`.
+After gene prediction, sequences are "cleaned" using `minsize-seq` from `[seq_cleaner]` in `config/annotapipeline.toml`.
 
 `.aa`, `.cdsexon` and `.codingseq` sequences are extracted from GFF output using `getAnnoFasta.pl` (AUGUSTUS script).
 
@@ -73,7 +74,7 @@ After gene prediction, sequences are "cleaned" based on minimal sequence size fr
 
 ## **2. Similarity analysis**
 
-Similarity analysis run through `blastp_parser.py`, which executes `blastp` with format 6 output (parsed after run) on predicted proteins (cleaned) against SwissProt:
+Similarity analysis runs through `blastp_parser.py`, which executes BLAST+ or DIAMOND with tab-separated output (parsed after the run) on cleaned predicted proteins against SwissProt:
 
 - qseqid
 - sseqid
@@ -86,11 +87,13 @@ Similarity analysis run through `blastp_parser.py`, which executes `blastp` with
 - stitle
   > `evalue` and `max_target_seqs` given by user
 
-This output is parsed to find annotations in the secondary database. The keyword list in `annotapipeline.yaml` is used to exclude potential hypothetical annotations.
+This output is parsed to find annotations in the secondary database. The keyword list in `[pipeline]` is used to exclude potential hypothetical annotations.
 
 Hits are classified &ndash; as a potential annotation &ndash; if: (i) it doesn't have any words in the keyword list, and (ii) passed value thresholds for identity, positivity and coverage. All potential annotations &ndash; hits that passed all criteria &ndash; are present in `BASENAME_SwissProt_annotations.txt` for manual check.
 
-Potential annotations are ranked by `bitscore` and the best hit is assigned to the corresponding protein. Proteins that aren't annotated based on SwissProt annotations, are separated in `BASENAME_BLASTp_AA_SwissProted.fasta` and `blastp` is rerun against the secondary database (selected in `annotapipeline.yaml`).
+Potential annotations are ranked by `bitscore` and the best hit is assigned to the corresponding protein. Proteins that aren't annotated based on SwissProt annotations, are separated in `BASENAME_BLASTp_AA_SwissProted.fasta` and the aligner is rerun against the secondary database (selected in `[databases]`).
+
+Set `[local_aligner] aligner = "blast"` (default) or `"diamond"`. For DIAMOND, `blast-exe` points to the `diamond` binary and `swissprot-db`/`secondary-db` must be DIAMOND-formatted databases. DIAMOND has no `qcovs` field, so the coverage threshold uses its `qcovhsp` output; BLAST+ runs are unchanged.
 
 Following the same process, `BASENAME_SpecifiedDB_annotations.txt` classifies potential annotations.
 
@@ -111,11 +114,11 @@ Annotation files:
 
 **Software arguments:**
 
-> Optional arguments can be given in `annotapipeline.yaml` for InterProScan, HMMER and RPS-BLAST (not tested)
+> Optional arguments can be given in the config file for InterProScan, HMMER and RPS-BLAST (not tested)
 
 - InterProScan &ndash; for annotated and hypothetical proteins &ndash; uses `-goterms` and `-iprlookup` arguments.
 - `hmmscan` runs with `--noali` argument and user values for `evalue` and `domE`. It also uses Pfam database.
-- RPS-BLAST runs with `evalue` and `max_target_seqs` arguments given in `annotapipeline.yaml` and `-outfmt 6 "qseqid sseqid sacc bitscore evalue ppos pident qcovs stitle"`. RPS-BLAST uses CDD database.
+- RPS-BLAST runs with `evalue` and `max_target_seqs` from `[rpsblast]` and the same nine-column tabular contract written to `BASENAME_rpsblast_output.tsv`. RPS-BLAST uses the CDD database and remains BLAST+-only.
 
 **Parsing:**
 
@@ -134,15 +137,15 @@ Analysis starts with `kallisto index` and is followed by `kallisto quant`:
 
 - 1 &ndash; paired-end data &ndash; using estimated average fragment length (`l`) and estimated standard deviation of fragment length (`s`)
 
-  - Optional arguments for paired-end data if given by user in `annotapipeline.yaml`
+  - Optional arguments for paired-end data in `[kallisto]`, if given
 
   OR
 
-- 2 &ndash; single-end data &ndash; using **REQUIRED** arguments estimated average fragment length (`l`) and estimated standard deviation of fragment length (`s`) given by user in `annotapipeline.yaml`
+- 2 &ndash; single-end data &ndash; using **REQUIRED** `l` and `s` values from `[kallisto]`
 
 **Parsing:**
 
-- `kallisto_parser.py` removes hits &ndash; by TPM value &ndash; below the `threshold` parameter from `proteomics` section. Possible thresholds are:
+- `kallisto_parser.py` removes hits &ndash; by TPM value &ndash; below the `threshold` parameter from `[kallisto]`. Possible thresholds are:
   - Median
   - Mean
   - Float value (user input)
@@ -150,7 +153,7 @@ Analysis starts with `kallisto index` and is followed by `kallisto quant`:
 
 ## **5. Optional: Peptide identification**
 
-> **WARNING 1:** Faild runs for Comet MS/MS don't crash AnnotaPipeline, so check AnnotaPipeline_Log.log to assure all spectrometry files produced outputs
+> **WARNING 1:** Failed Comet MS/MS runs do not stop AnnotaPipeline, so check `AnnotaPipeline_LogFile.log` to confirm that every spectrometry file produced an output
 
 > **WARNING 2:** Before run, check if your comet.params file is compatible with installed comet version
 
@@ -173,7 +176,7 @@ Comet MS/MS outputs (files with `.pin` extension) and raw files are moved to cur
 
 Percolator runs for each `.pin` file with default parameters.
 
-Percolator outputs are parsed by `percolator_parser.py` using `percolator-qvalue` (`annotapipeline.yaml`). Raw files are maintained. `quantitative_proteomics` function uses parsed Percolator files to create `BASENAME_Total_Proteomics_Quantification.tsv`.
+Percolator outputs are parsed by `percolator_parser.py` using `percolator-qvalue` from `[proteomics]`. Raw files are kept. `quantitative_proteomics` uses parsed Percolator files to create `BASENAME_Total_Proteomics_Quantification.tsv`.
 
 This output quantifies (all spectometry outputs):
 
@@ -196,12 +199,14 @@ This output quantifies (all spectometry outputs):
 AnnotaPipeline requires the following software to run properly:
 
 - BLAST+ and RPS-BLAST (available at <https://ftp.ncbi.nih.gov/blast/executables/blast+/LATEST>)
+- DIAMOND (optional, <https://github.com/bbuchfink/diamond>) when `aligner = "diamond"`
 - InterProScan (available at <https://interproscan-docs.readthedocs.io/en/latest/HowToDownload.html>)
 - HMMER (available at <http://hmmer.org/download.html>)
 
 You will also need to install [AUGUSTUS](https://doi.org/10.1093/bioinformatics/btr010) (available at <https://github.com/Gaius-Augustus/Augustus>) if you want to run this pipeline starting with gene/protein prediction.
 
-Before executing, please modify the necessary fields in the configuration file (`annotapipeline.yaml`).
+Before executing, copy `config/annotapipeline.toml` and replace the path and
+organism placeholders.
 
 Repository directories are lower case: pipeline scripts live in `scripts/`
 and configuration files in `config/`.
@@ -277,24 +282,27 @@ and configuration files in `config/`.
 
 ## **Using Pixi**
 
-The Nextflow workflow uses [Pixi](https://pixi.sh) to pin Nextflow
-`25.10.4` and the Python dependencies. Install Pixi, then run:
+[Pixi](https://pixi.sh) is the pinned runtime for both entry points. It
+provides Python `3.12.16`, Nextflow `25.10.4`, OpenJDK `21.0.13.1`, Biopython
+`1.85`, pandas `2.2.3` and Typer `0.29.2`. The development environment adds
+Ruff and `ty`. Install Pixi, then run:
 
 ```bash
 pixi install --locked
+pixi run --locked python scripts/annotapipeline.py -h
 ```
 
-External tools and reference databases are required. Each reference
-directory must contain a non-empty `SHA256SUMS` manifest; see the
-[reference contract](docs/nextflow.md#reference-contract). The conda
-environment below supports the direct runner.
+The `runtime` Pixi environment omits Ruff and `ty` and is used by the Docker image.
+External tools and reference databases are still required. Each Nextflow
+reference directory must contain a non-empty `SHA256SUMS` manifest; see the
+[reference contract](docs/nextflow.md#reference-contract).
 
 ## **Python scripts**
 
 The Python layer in `scripts/` contains the Nextflow task adapters, shared
-I/O helpers, and the command-line parsers. Each CLI accepts `-h`, `-help`,
-and `--help`. Identifiers follow Python `snake_case` and file names are lower
-case. Ruff handles formatting and linting:
+I/O and configuration helpers, and the command-line parsers. Each CLI accepts
+`-h`, `-help`, and `--help`. Identifiers follow Python `snake_case` and file
+names are lower case. Ruff handles formatting and style; `ty` checks types:
 
 ```bash
 pixi run --locked format
@@ -306,74 +314,53 @@ Command flags, inputs, and outputs are listed in
 
 ## **Using conda**
 
-1. Download `annota_environment.yaml` file
-
-2. Create environment
-
-   2.1 with _default_ conda
-
-   ```bash
-   conda env create -n <desired_name> -f annota_environment.yaml
-   ```
-
-   2.2 with [mamba](https://github.com/mamba-org/mamba) (speedup installation)
-
-   ```bash
-   conda update -n base conda
-
-   conda install -n base -c conda-forge mamba
-
-   mamba env create -n <desired_name> -f annota_environment.yaml
-   ```
-
-3. Activate environment
+The Conda environment is a convenience option for the direct runner; Pixi is
+the pinned runtime. From the repository root:
 
 ```bash
-    conda activate <desired_name>
+conda env create -n annotapipeline -f annota_environment.yaml
+conda activate annotapipeline
 ```
 
-4. [**Download databases**](#download-databases)
-
-5. Configure [**InterProScan databases**](#interproscan-tested-databases) and `annotapipeline.yaml`
+[mamba](https://github.com/mamba-org/mamba) can replace `conda env create`
+with `mamba env create`. Then [**download databases**](#download-databases),
+configure [InterProScan](#interproscan-tested-databases), and follow
+[configure the runner](#configure-the-runner).
 
 ### **Setup AUGUSTUS species for personalized predictions**
 
-1. Locate AnnotaPipeline environment home
+1. Locate the environment home:
 
 ```bash
-    echo $CONDA_PREFIX
+echo "$CONDA_PREFIX"
 ```
 
-2. Go to `$CONDA_PREFIX/config/species`
-
-```bash
-    cd $CONDA_PREFIX/config/species
-```
-
-3. Add custom species folder (trained results)
+2. Add the trained species folder under `$CONDA_PREFIX/config/species`.
 
 ## **Manual install**
 
-1. Clone repository
+1. Clone the repository:
 
 ```bash
-   git clone https://github.com/labioinfoufsc/AnnotaPipeline.git
+git clone https://github.com/labioinfoufsc/AnnotaPipeline.git
+cd AnnotaPipeline
 ```
 
-2. Run `setup.py` from the repository root; the scripts in `scripts/` will
-   be available at `$PATH`
+2. Install the Python package from the repository root; scripts in `scripts/`
+   become available on `$PATH`:
 
 ```bash
-   python3 setup.py
+python3 -m pip install .
 ```
 
-3. Install required softwares:
+3. Install the required software:
 
    - BLAST+ and RPS-BLAST (available at <https://ftp.ncbi.nih.gov/blast/executables/blast+/LATEST>)
+- DIAMOND (optional, <https://github.com/bbuchfink/diamond>) when `aligner = "diamond"`
    - InterProScan (available at <https://interproscan-docs.readthedocs.io/en/latest/HowToDownload.html>)
    - HMMER (available at <http://hmmer.org/download.html>)
 
-4. Optional softwares
+4. Optional software:
 
    - Kallisto (available at <https://pachterlab.github.io/kallisto/download.html>)
    - Comet MS/MS (available at <https://github.com/UWPR/Comet/releases/latest>)
@@ -381,15 +368,51 @@ Command flags, inputs, and outputs are listed in
 
 5. [**Download databases**](#download-databases)
 
-6. Configure `annotapipeline.yaml`
+6. Follow [configure the runner](#configure-the-runner).
 
-## **Setup `annotapipeline.yaml`**
+## **Configure the runner**
 
-> **TIP:** InterProScan can also be installed separately and configured in
-> `annotapipeline.yaml`.
+`config/annotapipeline.toml` is the canonical configuration for
+`annotapipeline.py`. `config/config_example.toml` is a worked example. TOML is
+parsed with Python 3.12's `tomllib`, so `on` and `off` stay strings and
+numeric settings keep their types.
 
-Use the example configuration files as a guide:
-`config/annotapipeline.yaml` and `config/config_example.yaml`.
+YAML application configuration is no longer supported; use a `.toml` file.
+See [migration.md](config/migration.md) for a one-off YAML-to-TOML conversion.
+The conversion is non-destructive: keep the original YAML file outside the
+runner and write a new `.toml` file. GitHub Actions and
+`annota_environment.yaml` remain YAML because their tools require it.
+
+`threads = 0` reads `SLURM_CPUS_PER_TASK` or `NSLOTS`, falling back to one
+thread. A positive integer overrides scheduler detection.
+
+> **TIP:** InterProScan can also be installed separately and configured with
+> `interproscan-exe`.
+
+## **Container image**
+
+`Dockerfile` builds an orchestrator-only image with the locked Pixi `runtime`
+environment: Python, Nextflow, Java and Python libraries. BLAST+, DIAMOND,
+AUGUSTUS, HMMER, InterProScan, Kallisto, Comet, Percolator and reference
+databases are **not** included; mount them under `/data` or supply them through
+site configuration.
+
+```bash
+docker build -t annotapipeline:orchestrator .
+docker run --rm annotapipeline:orchestrator python --version
+docker run --rm annotapipeline:orchestrator nextflow -version
+```
+
+The container runs as UID/GID 10001 with `/work` as its working directory.
+Bind-mounted paths must be writable by that identity, or run with
+`--user "$(id -u):$(id -g)"`. On SELinux hosts append `:z` or `:Z` to bind
+mounts; otherwise the daemon can deny reads even to container root:
+
+```bash
+docker run --rm -v "$PWD/tests:/opt/annotapipeline/tests:ro,z" \
+  -w /opt/annotapipeline annotapipeline:orchestrator \
+  python -m unittest discover -s tests
+```
 
 # **How to run**
 
@@ -405,10 +428,13 @@ pixi run --locked nextflow run . \
   -resume
 ```
 
-`params.json` is a JSON parameter file; paths resolve relative to the launch
-directory. Exactly one of `genome` or `protein` is required, and `gff` is
-valid only with `protein`. Published outputs are written to
-`results/<basename>/`.
+`params.json` is a native Nextflow JSON parameter file; paths resolve relative
+to the launch directory. Exactly one of `genome` or `protein` is required, and
+`gff` is valid only with `protein`. Published outputs are written to
+`results/<basename>/`. Resource defaults (`cpus`, `memory`, `time`) are
+conservative; set them from the scheduler or a site config. The `docker`,
+`apptainer` and `conda` profiles enable engines only, without binding process
+containers or environments.
 
 See [`docs/nextflow.md`](docs/nextflow.md) for the full parameter reference,
 reference contract, execution profiles, and resume behaviour.
@@ -419,8 +445,8 @@ reference contract, execution profiles, and resume behaviour.
 
 ## **Python runner**
 
-The `annotapipeline.py` CLI reads `annotapipeline.yaml` and accepts three
-input modes:
+The `annotapipeline.py` CLI reads `config/annotapipeline.toml` and accepts
+three input modes. With Pixi:
 
 - [**Protein file as input**](#protein-file-as-input)
 - [**Genome file as input**](#genome-file-as-input)
@@ -429,7 +455,8 @@ input modes:
 ## **Protein file as input**
 
 ```bash
-annotapipeline.py -c annotapipeline.yaml -p protein_sequences.fasta
+pixi run --locked python scripts/annotapipeline.py \
+  -c config/annotapipeline.toml -p protein_sequences.fasta
 ```
 
 The pipeline annotates the submitted `protein_sequences.fasta` and writes
@@ -439,7 +466,8 @@ not produce an annotated GFF file.
 ## **Genome file as input**
 
 ```bash
-annotapipeline.py -c annotapipeline.yaml -s genomic_data.fasta
+pixi run --locked python scripts/annotapipeline.py \
+  -c config/annotapipeline.toml -s genomic_data.fasta
 ```
 
 AUGUSTUS predicts genes and proteins from `genomic_data.fasta`; the
@@ -449,7 +477,9 @@ for the species.
 ## **Protein and GFF files as input**
 
 ```bash
-annotapipeline.py -c annotapipeline.yaml -p protein_sequences.fasta -gff gff_file.gff
+pixi run --locked python scripts/annotapipeline.py \
+  -c config/annotapipeline.toml \
+  -p protein_sequences.fasta -gff gff_file.gff
 ```
 
 Supply `.aa` and `.gff` files from AUGUSTUS predictions. The submitted GFF
@@ -461,7 +491,7 @@ from the supplied proteins.
 AnnotaPipeline, it will output five main files (along with many others in their respective folders):
 
 - `All_Annotated_Products.txt` contains all unique sequence identifiers and their respective annotations (with functional annotations &ndash; when present).
-- ` Annota_BASENAME.fasta` contains all sequences and their annotations (with functional annotations &ndash; when present) in FASTA format.
+- `AnnotaPipeline_BASENAME_proteins.fasta` contains all sequences and their annotations (with functional annotations &ndash; when present) in FASTA format.
 - `BASENAME_Annotated_GFF.gff` contains all sequences and their annotations (with functional annotations &ndash; when present) in GFF3 format.
   > This file is absent in [**Protein file as input**](#protein-file-as-input) run mode
 - `AnnotaPipeline_BASENAME_transcripts.fasta` contains nucleotide sequences for predicted proteins, with the same features present in the protein file.
@@ -470,7 +500,7 @@ AnnotaPipeline, it will output five main files (along with many others in their 
 Raw outputs are listed inside output folders:
 
 - `1_GenePrediction_BASENAME` &ndash; AUGUSTUS files
-- `2_SimilarityAnalysis_BASENAME` &ndash; BLASTP analysis
+- `2_SimilarityAnalysis_BASENAME` &ndash; BLAST+ or DIAMOND analysis
 - `3_FunctionalAnnotation_BASENAME` &ndash; InterProScan/HMMER/RPS-BLAST analysis
 - `4_TranscriptQuantification_BASENAME` &ndash; Kallisto analysis
 - `5_PeptideIdentification_BASENAME` &ndash; Comet MS/MS and Percolator analysis
@@ -485,17 +515,20 @@ Output folders and files are written to the launch directory.
 # **Tests**
 
 ```bash
+pixi run --locked format
+pixi run --locked lint
 pixi run --locked test
 ```
 
-Integration tests replace external tools with fixtures and verify DAG
-behaviour, output publishing, resume, and CLI contracts. Run
-`pixi run --locked lint` before the suite. Real-tool validation is pending;
-see [tests](docs/nextflow.md#tests).
+Fixture tests replace external tools and cover configuration loading, parser
+invariants, all three direct-runner input modes, DAG behaviour, output
+publishing, resume, and CLI contracts. Real-tool validation against the real
+databases and the v1.0 output baseline is still pending; see
+[tests](docs/nextflow.md#tests).
 
 # **Citation**
 
-If you used AnnotPipeline in your research, please cite us
+If you used AnnotaPipeline in your research, please cite us
 
 [AnnotaPipeline: An integrated tool to annotate eukaryotic proteins using multi-omics data](https://doi.org/10.3389/fgene.2022.1020100)
 

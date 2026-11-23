@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Legacy CLI for building the AnnotaPipeline summary table."""
 
 import re
@@ -65,12 +66,8 @@ def main(
                 elif linha == seq_reg[1]:
                     if linha == seq_reg[-1]:
                         add_none_to_empty()
-                        add_to_dicts(
-                            nome_subject, ontologia, interpro, superfamily
-                        )
-                        ontologia, interpro, superfamily = (
-                            create_or_reset_lists()
-                        )
+                        add_to_dicts(nome_subject, ontologia, interpro, superfamily)
+                        ontologia, interpro, superfamily = create_or_reset_lists()
                     # IGNORING THE FIRST LINE ON EACH GROUP OF QUERIES, AS IT'S NON-INFORMATIVE
                 else:
                     linha = linha.split("\t")
@@ -90,27 +87,19 @@ def main(
                                         ontologia.append(hit)
                             if "Dbxref" in field:
                                 interpro.append(
-                                    field.replace('"', "").replace(
-                                        "Dbxref=", ""
-                                    )
+                                    field.replace('"', "").replace("Dbxref=", "")
                                 )
                         if "superfamily" in db.lower():
                             superfamily_line = linha[-1].split(";")
                             for field in superfamily_line:
                                 if "Name" in field:
                                     superfamily.append(
-                                        field.replace('"', "").replace(
-                                            "Name=", ""
-                                        )
+                                        field.replace('"', "").replace("Name=", "")
                                     )
                     if "\t".join(linha) == seq_reg[-1]:
                         add_none_to_empty()
-                        add_to_dicts(
-                            nome_subject, ontologia, interpro, superfamily
-                        )
-                        ontologia, interpro, superfamily = (
-                            create_or_reset_lists()
-                        )
+                        add_to_dicts(nome_subject, ontologia, interpro, superfamily)
+                        ontologia, interpro, superfamily = create_or_reset_lists()
 
     annotation_dict = {}
 
@@ -118,8 +107,10 @@ def main(
         with open(file) as source:
             annotations = source.read().splitlines()
         for line in annotations:
-            line = line.split("\t")
-            annotation_dict[line[0]] = re.split(r"\(InterPro|\(GO", line[1])[
+            fields = line.split("\t", 1)
+            if len(fields) != 2:
+                continue
+            annotation_dict[fields[0]] = re.split(r"\(InterPro|\(GO", fields[1])[
                 0
             ].strip()
 
@@ -168,16 +159,14 @@ def main(
         for key in source:
             unique_id_proteins[key] = None
 
-    with open(f"AnnotaPipeline_{basename}_Summary.tsv", "a") as file_output:
+    with open(f"AnnotaPipeline_{basename}_Summary.tsv", "w") as file_output:
         file_output.write(
             "ProteinID\tAnnotation\tIPR\tGO\tSuperfamily\tTranscript\tTPM\t"
             "Expression\tTotal_Peptide\tUnique_Peptide\n"
         )
         for protein in unique_id_proteins:
             transcript = (
-                "True"
-                if str(transcript_dict.get(protein)) != "None"
-                else "False"
+                "True" if str(transcript_dict.get(protein)) != "None" else "False"
             )
             expression = (
                 "True" if str(total_peptide.get(protein)) != "None" else "False"

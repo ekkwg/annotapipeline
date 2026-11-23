@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 """Legacy CLI for joining annotations into a GFF file."""
 
 import re
 
 import typer
+from sequence_utils import read_annotation_table
 
 app = typer.Typer(
     add_completion=False,
@@ -16,41 +18,33 @@ def main(
     gff: str = typer.Option(..., "-gff", "--gff"),
     basename: str = typer.Option(..., "-b", "--basename"),
 ) -> None:
-    def load_annotations(path):
-        result = {}
-        with open(path) as handle:
-            for line in handle:
-                fields = line.rstrip("\r\n").split("\t", 1)
-                if len(fields) == 2:
-                    result[fields[0]] = fields[1]
-        return result
-
     def transcript_id(fields):
         value = re.sub(r";.*", "", fields[-1])
         return re.sub(r".*=", "", value)
 
     def write_block(block, annotations, outfile):
-        identifier = None
         for line in block:
+            identifier = None
+            newline = ""
             if "\ttranscript\t" in line:
+                newline = "\n" if line.endswith("\n") else ""
                 fields = line.rstrip("\r\n").split("\t")
-                if len(fields) >= 2:
-                    identifier = transcript_id(fields)
-        if identifier not in annotations:
-            return
-        for line in block:
-            if "\ttranscript\t" in line:
-                fields = line.rstrip("\r\n").split("\t")
-                outfile.write(
-                    "\t".join(fields[:8])
-                    + "\t"
-                    + annotations[identifier]
-                    + "\n"
-                )
+                if len(fields) < 9:
+                    outfile.write(line)
+                    continue
+                identifier = transcript_id(fields)
+                if identifier not in annotations:
+                    outfile.write(line)
+                    continue
+                attributes = fields[8].rstrip(";").split(";")
+                annotation = annotations[identifier].replace("\t", " ").strip()
+                attributes.append(f"annotation={annotation}")
+                fields[8] = ";".join(attributes)
+                outfile.write("\t".join(fields) + newline)
             else:
                 outfile.write(line)
 
-    dict_anot = load_annotations(anot)
+    dict_anot = read_annotation_table(anot)
     with (
         open(str(gff)) as source,
         open(f"{basename!s}_Annotated_GFF.gff", "w") as outfile,

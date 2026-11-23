@@ -5,20 +5,29 @@ platforms = ["linux-64"]
 
 [dependencies]
 nextflow = "==25.10.4"
-openjdk = "21.*"
-python = "3.12.*"
+openjdk = "==21.0.13.1"
+python = "==3.12.16"
 biopython = "==1.85"
 pandas = "==2.2.3"
-pyyaml = "==6.0.2"
 typer = "==0.29.2"
 
 [tasks]
 test = "python -m unittest discover -s tests -v"
-lint = "ruff check scripts tests"
+lint = "ruff check scripts tests && ty check scripts tests"
 format = "ruff format --check scripts tests"
 
 [feature.dev.dependencies]
 ruff = "*"
+ty = "==0.0.108"
+
+[feature.runtime.dependencies]
+nextflow = "==25.10.4"
+openjdk = "==21.0.13.1"
+python = "==3.12.16"
+biopython = "==1.85"
+pandas = "==2.2.3"
+typer = "==0.29.2"
 
 [environments]
 default = { features = ["dev"] }
+runtime = { features = ["runtime"] }

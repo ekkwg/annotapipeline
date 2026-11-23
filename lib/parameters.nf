@@ -88,8 +88,9 @@ def settings(p) {
     ]
     def exe = [
         augustus: 'augustus', getannofasta: 'getAnnoFasta.pl',
-        blastp: 'blastp', hmmscan: 'hmmscan', rpsblast: 'rpsblast',
-        kallisto: 'kallisto', comet: 'comet', percolator: 'percolator',
+        blastp: 'blastp', diamond: 'diamond', hmmscan: 'hmmscan',
+        rpsblast: 'rpsblast', kallisto: 'kallisto', comet: 'comet',
+        percolator: 'percolator',
     ]
     keys(p.tools, exe.keySet(), 'tools').each { key, value ->
         exe[key] = text(value, "tools.${key}")
@@ -117,12 +118,16 @@ def settings(p) {
     cfg.refs = refs
 
     def blastDefaults = [
-        identity: 40, positivity: 60, coverage: 30, evalue: 1e-5,
-        max_targets: 10, db_format: 'nrdb', customsep: '|', customcolumn: 5,
+        aligner: 'blast', identity: 40, positivity: 60, coverage: 30,
+        evalue: 1e-5, max_targets: 10, db_format: 'nrdb', customsep: '|',
+        customcolumn: 5,
         keywords: ['fragment', 'hypothetical', 'partial', 'uncharacterized',
                    'unknown', 'unspecified'],
     ]
     def blast = blastDefaults + keys(p.blast, blastDefaults.keySet(), 'blast')
+    if (!(blast.aligner in ['blast', 'diamond'])) {
+        error 'blast.aligner must be blast or diamond'
+    }
     ['identity', 'positivity', 'coverage'].each { name ->
         decimal(blast[name], "blast.${name}", 0, 100)
     }
@@ -271,6 +276,24 @@ def runMetadata(p, Map cfg, String engineVersion) {
     provided.references = cfg.refs.collectEntries { name, ref ->
         [(name): [directory: ref.directory.toString(), entry: ref.entry,
                   manifest: ref.manifest, manifest_sha256: ref.digest]]
+    }
+    if (cfg.augustus?.flags) {
+        provided.augustus = [flags: cfg.augustus.flags,
+                             hints: cfg.augustus.hints.collect { it.toString() },
+                             extrinsic: cfg.augustus.extrinsic.collect { it.toString() }]
+    }
+    if (cfg.kallisto) {
+        provided.kallisto = [options: cfg.kallisto.options,
+                             reads: cfg.kallisto.reads.collect { it.toString() }]
+    }
+    if (cfg.proteomics) {
+        provided.proteomics = [
+            options: cfg.proteomics.options,
+            spectra: cfg.proteomics.spectra.collect { row ->
+                [id: row[0], path: row[1].toString()]
+            },
+            parameters: cfg.proteomics.parameters.toString(),
+        ]
     }
     provided
 }

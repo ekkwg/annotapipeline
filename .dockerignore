@@ -1,0 +1,13 @@
+.git
+.github
+.pixi
+.nextflow
+work
+results
+tests
+docs
+__pycache__
+*.py[cod]
+*.log
+AnnotaPipeline_*
+nextflow.log*

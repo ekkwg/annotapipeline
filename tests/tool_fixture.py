@@ -4,9 +4,7 @@ import sys
 from pathlib import Path
 
 PROTEINS = ">geneA label\nmaaa\n>geneB\nmccc\n>geneC\nmeee\n>geneD\nmggg\n"
-PSM_HEADER = (
-    "PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n"
-)
+PSM_HEADER = "PSMId\tscore\tq-value\tposterior_error_prob\tpeptide\tproteinIds\n"
 
 
 def ids(fasta):
@@ -21,9 +19,9 @@ def blast_row(query, title, coverage=90):
     return f"{query}\tref\tref\t50\t1e-20\t60\t40\t{coverage}\t{title}\n"
 
 
-def blastp(arg):
-    queries = ids(arg("-query"))
-    database = Path(arg("-db")).name
+def blastp(arg, prefix="-"):
+    queries = ids(arg(f"{prefix}query"))
+    database = Path(arg(f"{prefix}db")).name
     hits = []
     if database == "swiss":
         if "geneA" in queries:
@@ -42,7 +40,7 @@ def blastp(arg):
             hits.append(blast_row("geneC", "ref Low coverage [Plant]", 30))
     else:
         raise ValueError(f"unexpected database: {database}")
-    Path(arg("-out")).write_text("".join(hits))
+    Path(arg(f"{prefix}out")).write_text("".join(hits))
 
 
 def interproscan(arg):
@@ -71,17 +69,13 @@ def augustus():
         start, end = idx * 12 + 1, idx * 12 + 12
         strand = "-" if idx == 2 else "+"
         print(f"# start gene {query}")
-        print(
-            f"scaffold\tAUGUSTUS\tgene\t{start}\t{end}\t.\t{strand}\t."
-            f"\tID=gene{idx}"
-        )
+        print(f"scaffold\tAUGUSTUS\tgene\t{start}\t{end}\t.\t{strand}\t.\tID=gene{idx}")
         print(
             f"scaffold\tAUGUSTUS\ttranscript\t{start}\t{end}\t.\t{strand}\t."
             f"\tID={query};Parent=gene{idx}"
         )
         print(
-            f"scaffold\tAUGUSTUS\tCDS\t{start}\t{end}\t.\t{strand}\t0"
-            f"\tParent={query}"
+            f"scaffold\tAUGUSTUS\tCDS\t{start}\t{end}\t.\t{strand}\t0\tParent={query}"
         )
         print(f"# end gene {query}")
 
@@ -122,7 +116,6 @@ def kallisto(args, arg):
 
 def comet(args):
     spectrum = Path(args[-1])
-    assert spectrum.parent.resolve() == Path.cwd()
     parameters = Path(args[0][2:]).read_text()
     assert "output_percolatorfile = 1" in parameters
     assert "decoy_prefix = DECOY_" in parameters
@@ -153,10 +146,13 @@ def main(tool, args):
 
     if tool == "blastp":
         blastp(arg)
+    elif tool == "diamond":
+        if not args or args[0] != "blastp":
+            raise ValueError(f"unexpected diamond command: {args}")
+        blastp(arg, "--")
     elif tool == "rpsblast":
         hits = "".join(
-            blast_row(query, "ref Full CDD description")
-            for query in ids(arg("-query"))
+            blast_row(query, "ref Full CDD description") for query in ids(arg("-query"))
         )
         Path(arg("-out")).write_text(hits)
     elif tool == "hmmscan":

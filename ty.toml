@@ -1,0 +1,5 @@
+[environment]
+python-version = "3.12"
+# scripts/ is a flat module layout; list it before site-packages and the
+# repository root so `config` resolves to scripts/config.py, not config/.
+extra-paths = ["./scripts"]

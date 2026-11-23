@@ -1,20 +1,20 @@
+# Convenience environment for the direct Python runner.
+# The Pixi workspace is the pinned, canonical runtime (see pixi.toml).
 name: AnnotaPipeline
 channels:
-  - defaults
   - conda-forge
   - bioconda
 dependencies:
-  - python>=3.10
+  - python=3.12
+  - biopython=1.85
+  - pandas=2.2.3
+  - typer=0.29.2
   - setuptools
-  - pip
-  - typer>=0.12
   - bioconda::blast>=2.9.0
+  - bioconda::diamond=2.2.9
   - bioconda::interproscan>=5.52_86.0
   - bioconda::hmmer>=3.1b2
   - bioconda::kallisto>=0.46.1
   - bioconda::comet-ms>=2019015
   - bioconda::percolator>=3.05.0
   - bioconda::augustus>=3.3.3
-  - pip:
-    - PyYAML==6.0
-    - git+https://github.com/labioinfoufsc/AnnotaPipeline.git

@@ -1,40 +1,34 @@
+from pathlib import Path
+
 from setuptools import find_packages, setup
 
 requirements = [
-    "biopython>=1.73",
-    "pandas>=0.24.1",
-    "PyYAML>=6.0",
-    #'shutil',
-    #'argparse',
-    #'configparser',
-    #'logging',
-    #'os',
-    #'pathlib',
-    #'subprocess',
-    #'sys',
-    #'re',
-    #'warnings'
+    "biopython>=1.85",
+    "pandas>=2.2.3",
+    "typer>=0.12",
 ]
 
-# default python libraries
-# https://docs.python.org/3/library/
-
-with open("README.md") as rm:
-    long_description = rm.read()
+long_description = Path("README.md").read_text(encoding="utf-8")
 
 setup(
     name="AnnotaPipeline",
     packages=find_packages(),
-    py_modules=["annotation_io", "blast_classification"],
+    py_modules=[
+        "annotation_io",
+        "blast_classification",
+        "config",
+        "sequence_utils",
+    ],
     package_dir={"": "scripts"},
     version="2.0.0",
     description="Pipeline to predict and annotate eukaryotic genes",
     long_description=long_description,
     long_description_content_type="text/markdown",
     install_requires=requirements,
-    author="Guilherme Augusto Maia, Eric Kazuo Kawagoe, Vilmar Benetti Filho, \
-            Tatiany Aparecida Soratto, Renato Moreira Simões, Glauber Wagner",
+    author="Guilherme Augusto Maia, Eric Kazuo Kawagoe, Vilmar Benetti Filho, "
+    "Tatiany Aparecida Soratto, Renato Moreira Simões, Glauber Wagner",
     author_email="labinfo.ufsc@gmail.com",
+    license="Apache-2.0",
     zip_safe=False,
     scripts=[
         "scripts/annotapipeline.py",
@@ -49,18 +43,14 @@ setup(
         "scripts/summary_parser.py",
     ],
     include_package_data=True,
-    python_requires=">=3.6.9",
-    url="https://github.com/labioinfoufsc/AnnotaPipeline.git",
-    download_url="https://github.com/labioinfoufsc/AnnotaPipeline/archive/refs/heads/v1.0.zip",
+    python_requires=">=3.12",
+    url="https://github.com/labioinfoufsc/AnnotaPipeline",
     classifiers=[
         "Development Status :: 4 - Beta",
-        "License :: OSI Approved :: Apache Software License",
         "Intended Audience :: Science/Research",
-        "Natural Language :: Portuguese (Brazilian)Operating System :: Unix",
+        "Natural Language :: English",
+        "Operating System :: POSIX :: Linux",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.12",
     ],
 )
